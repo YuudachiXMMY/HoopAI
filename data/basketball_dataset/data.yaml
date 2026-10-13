@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['basketball', 'hoop']
+
+roboflow:
+  workspace: basketball-qus2n
+  project: basketball-detection
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/basketball-qus2n/basketball-detection/dataset/1

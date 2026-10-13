@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 2
+names: ['Basketball', 'Hoop']
+
+roboflow:
+  workspace: yimings-workspace-vykdp
+  project: hoopai
+  version: dataset
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/yimings-workspace-vykdp/hoopai/dataset/dataset

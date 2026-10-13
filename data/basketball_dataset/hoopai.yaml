@@ -1,0 +1,5 @@
+train: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/train/images
+val: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/valid/images
+test: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/test/images
+nc: 2
+names: ['basketball', 'hoop']
