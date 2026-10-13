@@ -18,12 +18,26 @@ def _check_ffmpeg():
         )
 
 
+def _remove_partial(out_file: Path) -> None:
+    """Drop the truncated file a killed or failed ffmpeg leaves behind.
+
+    Failed clips are absent from the returned list, so without this the output
+    directory still holds an unplayable mp4 that looks like a real highlight.
+    """
+    try:
+        out_file.unlink(missing_ok=True)
+    except OSError:
+        # Cleanup is best-effort; losing it must not abort the remaining clips.
+        pass
+
+
 def export_clips(
     video_path: str,
     events: List[ScoringEvent],
     output_dir: str,
     pre_roll: float = 4.0,   # seconds before the basket
     post_roll: float = 2.0,  # seconds after the basket
+    timeout: float = 120.0,  # per-clip wall-clock budget for one ffmpeg call
 ) -> List[str]:
     """
     Export one highlight clip per scoring event.
@@ -33,7 +47,8 @@ def export_clips(
     A single FFmpeg failure is reported and skipped rather than aborting the
     batch, so the returned list may be SHORTER than `events`. Callers that need
     to know compare `len(result)` against `len(events)`; every skipped event is
-    named in the printed summary.
+    named in the printed summary. A clip that exceeds `timeout` counts as such a
+    failure: raise it for unusually long pre/post rolls or very slow storage.
     """
     _check_ffmpeg()
 
@@ -68,12 +83,28 @@ def export_clips(
         ]
 
         print(f"  Exporting clip {i}/{len(events)}: {out_file.name}")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout
+            )
+        except subprocess.TimeoutExpired:
+            # Unbounded, a wedged ffmpeg (odd container, stalled network mount,
+            # hung decoder) blocks this sequential loop forever and prints
+            # nothing further, so the whole batch hangs with no diagnosis.
+            failed.append(event)
+            _remove_partial(out_file)
+            print(
+                f"  ⚠️  FFmpeg timed out after {timeout:.0f}s on clip "
+                f"{i}/{len(events)} (event @ {event.timestamp_seconds:.1f}s, "
+                f"frame {event.frame_index})"
+            )
+            continue
 
         if result.returncode != 0:
             # Name the event, not just the loop index: the index alone does not
             # say which basket was lost once the caller only has the returned list.
             failed.append(event)
+            _remove_partial(out_file)
             print(
                 f"  ⚠️  FFmpeg failed on clip {i}/{len(events)} "
                 f"(event @ {event.timestamp_seconds:.1f}s, frame {event.frame_index}, "

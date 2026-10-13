@@ -49,7 +49,8 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
 
 ## 陷阱
 
-1. **类别 ID 硬编码** —— `detect/basket_detector.py` 里 `BALL_CLASS = 0` / `HOOP_CLASS = 1`。
+1. **类别索引硬编码** —— `detect/basket_detector.py` 的 `ModelClass`（`BALL = 0` / `HOOP = 1`，
+   `BALL_CLASS` / `HOOP_CLASS` 是其别名）。加载后**不会**校验模型实际的类别名，
    换模型时若类别顺序变了，球和框会被静默互换，流水线输出零事件且不报错。
 
 2. **`sample_every_n` 与 `min_downward_frames` 耦合** —— 下落判定统计的是**被采样帧**，不是视频帧。
@@ -61,13 +62,17 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
 4. **进球判定要求球和框同帧可见** —— `ScoringEventDetector.update` 中任一为 `None` 就直接返回。
    篮框被遮挡或出画的整个区间都不会产生事件。
 
-5. **数据集 YAML 路径全部失效** —— `data/basketball_dataset/` 下三个 YAML 写的是
-   `/Users/user/HoopAI (Execute Plan)/...`（另一台机器）或解析不到的相对路径。
-   修复方式见 [RUNBOOK](docs/RUNBOOK.md#数据集-yaml-路径全部失效)。**修好后不要把本机绝对路径提交回仓库。**
+5. **数据集 YAML 路径必须相对 YAML 自身目录** —— 四个 YAML 都写成 `train: train/images` 并
+   **刻意不写 `path:`**：ultralytics 对相对 `path:` 是按 `datasets_dir` 设置解析，不是按仓库根。
+   见 [RUNBOOK](docs/RUNBOOK.md#数据集-yaml-路径)。**不要改成本机绝对路径，也不要加相对的 `path:`。**
 
 6. **模型欠训练** —— 只完成 2/20 轮，mAP50≈0.76。排查漏判时先怀疑这个，而不是判定逻辑。
 
 7. **样本视频文件名含空格** —— 如 `data/samples/IMG_2362 2.MOV`，shell 里必须加引号。
+
+8. **`.pt` 权重加载即执行代码** —— `YOLO(path)` 走 pickle 形式的 `torch.load`。权重不在仓库、无签名，
+   放进 `data/models/` 的文件要和「愿意直接执行的脚本」同等对待。来源不可控时给
+   `BasketDetector(expected_sha256=...)` 传校验和。
 
 ## 代码风格
 

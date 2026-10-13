@@ -34,6 +34,10 @@ brew install ffmpeg        # macOS
 | `data/*_dataset/{train,valid,test}/` | 图片与 YOLO 标签 | 从 Roboflow 重新下载（README 中有链接） |
 | `data/samples/*.MOV` | 测试用视频 | 自行录制或向维护者索取 |
 
+> **权重是可执行内容。** `YOLO(path)` 用 pickle 形式的 `torch.load` 加载 `.pt`，加载即执行文件内嵌的代码。
+> 只放你信得过来源的权重；来源不完全可控时给 `BasketDetector(expected_sha256=...)` 传校验和，
+> 详见 [RUNBOOK · 权重文件的信任边界](RUNBOOK.md#权重文件的信任边界)。
+
 ## 命令参考
 
 <!-- AUTO-GENERATED: 由 requirements.txt 与 runs/detect/data/models/basketball/args.yaml 生成，勿手改 -->
@@ -108,7 +112,7 @@ feat: track basketball scoring pipeline and add .gitignore
 
 - [ ] 代码能在干净的虚拟环境中 import（`python -c "import ingest, detect, events, clips"`）
 - [ ] 未提交被 `.gitignore` 排除的内容 —— 尤其是模型权重（`*.pt`）、视频（`*.mp4` / `*.MOV`）、数据集图片、`runs/`
-- [ ] 未提交绝对路径。数据集 YAML 里的 `train:` / `val:` / `test:` 路径若为本机绝对路径，不要提交（见 [RUNBOOK · 数据集 YAML 路径全部失效](RUNBOOK.md#数据集-yaml-路径全部失效)）
+- [ ] 未提交绝对路径。数据集 YAML 里的 `train:` / `val:` / `test:` 必须是相对 YAML 自身目录的子路径，不要换成本机绝对路径，也不要加相对的 `path:`（见 [RUNBOOK · 数据集 YAML 路径](RUNBOOK.md#数据集-yaml-路径)）
 - [ ] 改动了模块的公开接口 → 同步更新 README 中 `AUTO-GENERATED` 的「模块参考」表
 - [ ] 改动了 `requirements.txt` → 同步更新 README 与本文件中 `AUTO-GENERATED` 的依赖/命令表
 - [ ] 改动了默认参数 → 同步更新 README 的「调参要点」表

@@ -57,6 +57,10 @@ brew install ffmpeg
 
 模型权重位于 `data/models/basketball.pt`（已被 `.gitignore` 排除，不在仓库中，需本地自备或重新训练 —— 见 [docs/RUNBOOK.md](docs/RUNBOOK.md)）。
 
+> 加载 `.pt` 会执行文件内嵌的代码（pickle 形式的 `torch.load`），所以只放信得过来源的权重；
+> 来源不完全可控时用 `BasketDetector(expected_sha256=...)` 先校验 —— 见
+> [RUNBOOK · 权重文件的信任边界](docs/RUNBOOK.md#权重文件的信任边界)。
+
 ## 用法
 
 目前需要手动串联四个模块：
@@ -98,6 +102,8 @@ print(f"导出 {len(paths)} 个片段")
 | `ScoringEventDetector(min_downward_frames=)` | `3` | 判定「球在下落」所需的连续下降帧数 |
 | `_box_overlap(margin=)` | `1.4` | 篮框判定区域的放大系数（硬编码，非构造参数）。调大更宽容但会把擦框不进误判为进球 |
 | `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | 片段在事件时间点前后各截取的秒数。进球发生在开头 `pre_roll` 秒内时，起点截断到 0，片段相应变短，事件后仍保留 `post_roll` 秒 |
+| `export_clips(timeout=)` | `120.0` | 单个 ffmpeg 调用的墙钟上限（秒）。超时按失败处理：跳过该片段、删掉写了一半的文件、继续剪下一个。pre/post roll 调得很大或存储很慢时需调高 |
+| `BasketDetector(expected_sha256=)` | `None` | 可选。给出权重文件的 sha256 时，加载前先校验；不匹配抛 `ValueError`。默认不校验，行为与之前一致 |
 
 <!-- AUTO-GENERATED: 由源码导出符号生成，勿手改 -->
 ## 模块参考
@@ -113,9 +119,10 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `BALL_CLASS` | `= 0` | 自训练模型中 `basketball` 的类别 ID |
-| `HOOP_CLASS` | `= 1` | 自训练模型中 `hoop` 的类别 ID |
-| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35)` | 加载 YOLO 权重 |
+| `ModelClass` | `IntEnum(BALL=0, HOOP=1)` | 自训练模型的类别索引，顺序对应 `data.yaml` 的 `names` |
+| `BALL_CLASS` | `= ModelClass.BALL` | `basketball` 的类别 ID（`IntEnum` 成员，与 `int` 可直接比较） |
+| `HOOP_CLASS` | `= ModelClass.HOOP` | `hoop` 的类别 ID |
+| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35, expected_sha256: Optional[str] = None)` | 加载 YOLO 权重。给出 `expected_sha256` 时先校验文件再加载，不匹配抛 `ValueError` |
 | `BasketDetector.detect` | `(frame: np.ndarray) -> dict` | 返回 `{"ball": det \| None, "hoop": det \| None, "frame_shape": (h, w)}`；`det` 为 `{"box": [x1,y1,x2,y2], "confidence": float, "center": (cx, cy)}` |
 
 ### `events/scoring_event.py`
@@ -131,7 +138,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败只打印警告并跳过，不中断整批 —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
+| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0, timeout: float = 120.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败（非零退出或超过 `timeout`）只打印警告、删除半成品文件并跳过，不中断整批 —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
 
 输出文件名格式：`{视频名}_basket_{序号:03d}_t{时间戳:.1f}s.mp4`
 <!-- END AUTO-GENERATED -->

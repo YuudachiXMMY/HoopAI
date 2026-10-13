@@ -71,7 +71,7 @@ yolo detect train resume=True model=runs/detect/data/models/basketball/weights/l
 
 ### 从零重训
 
-先修好数据集路径（[§4](#数据集-yaml-路径全部失效)），然后：
+先确认数据集图片目录已就位（[§4](#数据集-yaml-路径)），然后：
 
 ```bash
 yolo detect train \
@@ -92,12 +92,30 @@ cp data/models/basketball.pt "data/models/basketball.pt.bak.$(date +%Y%m%d-%H%M%
 
 # 用新的 best.pt 替换
 cp runs/detect/data/models/basketball/weights/best.pt data/models/basketball.pt
+
+# 记下校验和：权重不在 git 里，这是之后唯一能确认文件没被换过的依据
+shasum -a 256 data/models/basketball.pt | tee -a data/models/CHECKSUMS.txt
 ```
 
 替换后必须用已知有进球的视频回归验证一遍，确认检出数量没有下降。
 
-`detect/basket_detector.py` 中 `BALL_CLASS = 0` / `HOOP_CLASS = 1` 是硬编码。
-**若新模型的类别顺序或数量与 `['basketball', 'hoop']` 不同，必须同步改这两个常量**，否则球和框会被互换，流水线静默输出零结果。
+`detect/basket_detector.py` 中 `ModelClass.BALL = 0` / `ModelClass.HOOP = 1` 是硬编码。
+**若新模型的类别顺序或数量与 `['basketball', 'hoop']` 不同，必须同步改这个枚举**，否则球和框会被互换，流水线静默输出零结果。
+
+### 权重文件的信任边界
+
+`YOLO(model_path)` 通过 pickle 形式的 `torch.load` 加载 `.pt`，**加载即执行文件里嵌入的代码**。权重不在仓库中、也没有签名，按 CONTRIBUTING 的说法是「向维护者索取或自行重训」—— 这意味着放进 `data/models/` 的文件必须和你愿意直接执行的脚本同等对待。
+
+来源不完全可控时，把校验和传给构造器，不匹配就在加载前抛 `ValueError`：
+
+```python
+detector = BasketDetector(
+    model_path="data/models/basketball.pt",
+    expected_sha256="<上面 CHECKSUMS.txt 里记下的值>",
+)
+```
+
+默认 `expected_sha256=None` 不做校验，行为与以前一致。
 
 ## 3. 回滚
 
@@ -121,30 +139,25 @@ git revert <commit>     # 已推送的提交用 revert
 
 ## 4. 故障排查
 
-### 数据集 YAML 路径全部失效
+### 数据集 YAML 路径
 
-**症状：** `yolo detect train` 报找不到数据集或图片数为 0。
+> 此前四个 YAML 的路径全部失效，现已修复。**别改回绝对路径。**
 
-**原因：** `data/basketball_dataset/` 下三个 YAML 的路径在本机都不成立：
-
-| 文件 | `train:` 路径 | 问题 |
-|------|---------------|------|
-| `hoopai.yaml` | `/Users/user/HoopAI (Execute Plan)/data/basketball_dataset/train/images` | 另一台机器的绝对路径 |
-| `data_fixed.yaml` | `/Users/user/HoopAI (Execute Plan)/data/train/images` | 绝对路径，且少了 `basketball_dataset/` 一层 |
-| `data.yaml` | `../train/images` | 相对路径解析到 `data/train/images`，该目录不存在 |
-
-**修复：** 改成以仓库根为基准的相对路径（ultralytics 支持 `path` + 相对子路径）：
+四个 dataset YAML 的 `train:` / `val:` / `test:` 现在都是**相对 YAML 自身所在目录**的子路径：
 
 ```yaml
-path: data/basketball_dataset
 train: train/images
 val: valid/images
 test: test/images
-nc: 2
-names: ['basketball', 'hoop']
 ```
 
-修好后**不要**把本机绝对路径提交回仓库。
+**为什么省略 `path:`：** ultralytics 解析 `path:` 的规则是 —— 绝对路径按原样用；**相对路径按 `datasets_dir` 设置解析，不是按仓库根**。所以 `path: data/basketball_dataset` 只在 `datasets_dir` 恰好等于仓库根时才成立，换机器就断。完全省掉 `path:` 时 ultralytics 回退到 YAML 文件自身的父目录（绝对路径），这才是跨机器稳定的写法。
+
+> 本仓库没装 ultralytics、数据集图片也不在版本控制里，所以上面的写法**没有跑一次真实训练验证过**，只是依据 ultralytics 的路径解析规则推出的。第一次重训时若仍报图片数为 0，先确认 `data/basketball_dataset/{train,valid,test}/images/` 确实存在（需从 Roboflow 重新下载）。
+
+**此前的问题**（`git log` 可查）：`hoopai.yaml` 与 `data_fixed.yaml` 写的是另一台机器的绝对路径 `/Users/user/HoopAI (Execute Plan)/...`；两个 `data.yaml` 沿用 Roboflow 导出默认的 `../train/images`，而本仓库把导出内容多放了一层，于是解析到不存在的 `data/train/images`。
+
+**不要**把本机绝对路径提交回仓库 —— `docs/CONTRIBUTING.md` 的 PR 清单对此有一条自查项。
 
 ### `hoopal_dataset` 没有验证集
 
@@ -159,6 +172,20 @@ OSError: ffmpeg not found. Install it with:  brew install ffmpeg
 ```
 
 `clips/clip_exporter.py` 在导出前用 `shutil.which("ffmpeg")` 检查。安装后重开终端，确认 `ffmpeg` 在 `PATH` 中。
+
+### `⚠️  FFmpeg timed out after 120s on clip N/M`
+
+单个片段的 ffmpeg 调用超过了 `export_clips(timeout=)`（默认 120 秒）。该片段被跳过、半成品文件被删除，整批继续 —— 所以**返回的列表会短于 `events`**，结尾的汇总行会列出丢掉的时间戳。
+
+常见原因与处理：
+
+| 原因 | 处理 |
+|------|------|
+| `pre_roll` / `post_roll` 调得很大，片段本身就长 | 调高 `timeout` |
+| 源视频在网络盘 / 外置盘上，读取慢 | 先把视频拷到本地再跑，或调高 `timeout` |
+| 源文件损坏，ffmpeg 卡在解码上 | 按下面「`RuntimeError: Could not open video`」转码后重试 |
+
+超时前整批会一直卡住不动而且不报错，这正是加 `timeout` 的原因；若确实需要无限等待，传一个很大的值而不是去掉它。
 
 ### `FileNotFoundError: Video not found`
 
@@ -218,8 +245,9 @@ ffmpeg -i "输入.MOV" -r 30 -c:v libx264 -crf 20 -c:a aac 输出.mp4
 |------|------|------|
 | 没有流水线入口脚本 | 每次使用都要手写串联代码 | 仓库根目录 |
 | 模型只训练了 2/20 轮 | 漏判率偏高 | `data/models/basketball.pt` |
-| 三个数据集 YAML 路径全部失效 | 无法直接重训 | `data/basketball_dataset/*.yaml` |
-| 类别 ID 硬编码 | 换模型时若类别顺序变化会静默出错 | `detect/basket_detector.py:10-11` |
+| 数据集 YAML 路径改成相对写法后未经真实训练验证 | 重训前需先确认图片目录存在 | `data/*_dataset/*.yaml` |
+| 类别索引硬编码，且不校验模型实际类别名 | 换模型时若类别顺序变化会静默出错 | `detect/basket_detector.py` 的 `ModelClass` |
+| 权重加载走 pickle，无签名；校验和需手工传入 | 来源不可控的 `.pt` 加载即执行任意代码 | `detect/basket_detector.py` 的 `BasketDetector.__init__` |
 | `_box_overlap` 的 `margin` 不可配置 | 调误报率需改源码 | `events/scoring_event.py:20` |
 | 没有测试 | 改动判定逻辑无回归保护 | 全仓库 |
 | `tqdm` 在依赖中但未使用 | 无进度条，长视频无进展反馈 | `requirements.txt` |
@@ -232,4 +260,5 @@ ffmpeg -i "输入.MOV" -r 30 -c:v libx264 -crf 20 -c:a aac 输出.mp4
 1. 加入口脚本 `main.py`（CLI 接视频路径与输出目录）—— 消除最大的使用摩擦
 2. 继续训练到 20 轮并记录指标 —— 直接降低漏判
 3. 为 `_box_overlap` 和 `ScoringEventDetector` 补测试 —— 调参时才敢动
-4. 用 `logging` 替换 `print`，接上 `tqdm` 进度条
+4. `BasketDetector.__init__` 里把加载后的 `self.model.names` 与 `['basketball', 'hoop']` 比一遍并在不符时报错 —— 彻底消掉「换模型静默互换球和框」这个陷阱，比靠文档提醒可靠
+5. 用 `logging` 替换 `print`，接上 `tqdm` 进度条

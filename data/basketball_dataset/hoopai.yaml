@@ -1,5 +1,9 @@
-train: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/train/images
-val: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/valid/images
-test: /Users/user/HoopAI (Execute Plan)/data/basketball_dataset/test/images
+# Paths are relative to THIS FILE's directory. ultralytics uses the YAML's own
+# parent as the dataset root when `path:` is omitted; a relative `path:` would
+# instead resolve against the `datasets_dir` setting, which is not this repo.
+# Do not replace these with machine-local absolute paths (see docs/CONTRIBUTING.md).
+train: train/images
+val: valid/images
+test: test/images
 nc: 2
 names: ['basketball', 'hoop']

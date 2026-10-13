@@ -1,6 +1,10 @@
-train: ../train/images
-val: ../valid/images
-test: ../test/images
+# Adjusted from the Roboflow export default (`../train/images`): this repo keeps
+# the export one directory deeper, so the payload sits beside this file.
+# NOTE: valid/ and test/ are empty in this export — see docs/RUNBOOK.md, this
+# dataset cannot be trained on standalone.
+train: train/images
+val: valid/images
+test: test/images
 
 nc: 2
 names: ['Basketball', 'Hoop']
