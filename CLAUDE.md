@@ -67,10 +67,7 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
 
 6. **模型欠训练** —— 只完成 2/20 轮，mAP50≈0.76。排查漏判时先怀疑这个，而不是判定逻辑。
 
-7. **`.claude/launch.json` 是无效残留** —— 被 git 跟踪，但内容指向另一个项目
-   （`ssms-portal`，npm/Vite，端口 5173）。本项目没有 npm 也没有 dev server，不要参考它。建议删除。
-
-8. **样本视频文件名含空格** —— 如 `data/samples/IMG_2362 2.MOV`，shell 里必须加引号。
+7. **样本视频文件名含空格** —— 如 `data/samples/IMG_2362 2.MOV`，shell 里必须加引号。
 
 ## 代码风格
 
