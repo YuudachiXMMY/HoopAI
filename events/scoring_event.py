@@ -23,7 +23,7 @@ class ScoringEvent:
     ball_center: Point
 
 
-def _box_overlap(ball_center, hoop_box, margin: float = 1.4) -> bool:
+def _box_overlap(ball_center: Point, hoop_box: List[int], margin: float = 1.4) -> bool:
     """Check if ball center is inside hoop box (with margin for near-misses)."""
     cx, cy = ball_center
     x1, y1, x2, y2 = hoop_box

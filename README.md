@@ -31,7 +31,7 @@
 | 依赖 | 版本 | 说明 |
 |------|------|------|
 | Python | 3.11+ | 本机实测 3.12.13；仓库中残留的 `__pycache__` 是 3.11 编译的，可安全删除 |
-| FFmpeg | 任意近期版本 | `clips.clip_exporter` 直接调用 `ffmpeg` 命令行，缺失会抛 `EnvironmentError` |
+| FFmpeg | 任意近期版本 | `clips.clip_exporter` 直接调用 `ffmpeg` 命令行，缺失会抛 `OSError` |
 
 安装：
 
@@ -97,7 +97,7 @@ print(f"导出 {len(paths)} 个片段")
 | `ScoringEventDetector(cooldown_seconds=)` | `3.0` | 两次进球事件的最小间隔，用于抑制同一次进球被重复计数 |
 | `ScoringEventDetector(min_downward_frames=)` | `3` | 判定「球在下落」所需的连续下降帧数 |
 | `_box_overlap(margin=)` | `1.4` | 篮框判定区域的放大系数（硬编码，非构造参数）。调大更宽容但会把擦框不进误判为进球 |
-| `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | 片段在事件时间点前后各截取的秒数 |
+| `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | 片段在事件时间点前后各截取的秒数。进球发生在开头 `pre_roll` 秒内时，起点截断到 0，片段相应变短，事件后仍保留 `post_roll` 秒 |
 
 <!-- AUTO-GENERATED: 由源码导出符号生成，勿手改 -->
 ## 模块参考
@@ -106,7 +106,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `extract_frames` | `(video_path: str, sample_every_n: int = 1)` | 生成器，逐帧 yield `(frame_index, timestamp_seconds, frame)`。文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError` |
+| `extract_frames` | `(video_path: str, sample_every_n: int = 1) -> Iterator[Tuple[int, float, np.ndarray]]` | 生成器，逐帧 yield `(frame_index, timestamp_seconds, frame)`。文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError`；`sample_every_n < 1` 抛 `ValueError` |
 | `get_video_info` | `(video_path: str) -> dict` | 返回 `fps` / `frame_count` / `width` / `height` / `duration_seconds` |
 
 ### `detect/basket_detector.py`

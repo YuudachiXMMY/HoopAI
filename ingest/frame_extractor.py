@@ -4,10 +4,15 @@ Reads a video file and yields frames with their timestamps for downstream proces
 """
 
 import cv2
+import numpy as np
 from pathlib import Path
+from typing import Iterator, Tuple
 
 
-def extract_frames(video_path: str, sample_every_n: int = 1):
+def extract_frames(
+    video_path: str,
+    sample_every_n: int = 1,
+) -> Iterator[Tuple[int, float, np.ndarray]]:
     """
     Generator — yields (frame_index, timestamp_seconds, frame) for each sampled frame.
 
@@ -20,7 +25,14 @@ def extract_frames(video_path: str, sample_every_n: int = 1):
         FileNotFoundError:  video_path does not exist.
         RuntimeError:       the file could not be opened, or reports an unusable
                             frame rate (see below).
+        ValueError:         sample_every_n is below 1.
     """
+    if sample_every_n < 1:
+        # Checked up front rather than left to `frame_idx % sample_every_n`
+        # below, where 0 surfaces as a bare ZeroDivisionError and a negative
+        # step silently samples on Python's sign-of-divisor modulo instead.
+        raise ValueError(f"sample_every_n must be >= 1, got {sample_every_n}")
+
     path = Path(video_path)
     if not path.exists():
         raise FileNotFoundError(f"Video not found: {video_path}")

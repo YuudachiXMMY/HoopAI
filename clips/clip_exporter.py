@@ -13,7 +13,7 @@ from events.scoring_event import ScoringEvent
 
 def _check_ffmpeg():
     if not shutil.which("ffmpeg"):
-        raise EnvironmentError(
+        raise OSError(
             "ffmpeg not found. Install it with:  brew install ffmpeg"
         )
 
@@ -46,7 +46,11 @@ def export_clips(
 
     for i, event in enumerate(events, start=1):
         start = max(0.0, event.timestamp_seconds - pre_roll)
-        duration = pre_roll + post_roll
+        # Derived from the clamped start, not from pre_roll + post_roll: for a
+        # basket inside the first `pre_roll` seconds the start clamps to 0, and a
+        # constant duration would push the cut that much further past the basket
+        # than the documented window above.
+        duration = event.timestamp_seconds + post_roll - start
 
         out_file = out_dir / f"{video_name}_basket_{i:03d}_t{event.timestamp_seconds:.1f}s.mp4"
 

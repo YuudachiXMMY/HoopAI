@@ -155,7 +155,7 @@ names: ['basketball', 'hoop']
 ### `ffmpeg not found`
 
 ```
-EnvironmentError: ffmpeg not found. Install it with:  brew install ffmpeg
+OSError: ffmpeg not found. Install it with:  brew install ffmpeg
 ```
 
 `clips/clip_exporter.py` 在导出前用 `shutil.which("ffmpeg")` 检查。安装后重开终端，确认 `ffmpeg` 在 `PATH` 中。
