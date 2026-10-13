@@ -5,7 +5,6 @@ Uses the custom-trained YOLOv8 model to detect both the basketball and hoop.
 
 from ultralytics import YOLO
 import numpy as np
-from pathlib import Path
 
 BALL_CLASS = 0   # 'basketball' in our custom model
 HOOP_CLASS = 1   # 'hoop' in our custom model

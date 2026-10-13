@@ -28,7 +28,12 @@ def export_clips(
     """
     Export one highlight clip per scoring event.
 
-    Returns list of output file paths.
+    Returns the list of successfully written file paths.
+
+    A single FFmpeg failure is reported and skipped rather than aborting the
+    batch, so the returned list may be SHORTER than `events`. Callers that need
+    to know compare `len(result)` against `len(events)`; every skipped event is
+    named in the printed summary.
     """
     _check_ffmpeg()
 
@@ -37,6 +42,7 @@ def export_clips(
 
     video_name = Path(video_path).stem
     output_paths = []
+    failed = []
 
     for i, event in enumerate(events, start=1):
         start = max(0.0, event.timestamp_seconds - pre_roll)
@@ -61,8 +67,24 @@ def export_clips(
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
-            print(f"  ⚠️  FFmpeg error on clip {i}:\n{result.stderr}")
+            # Name the event, not just the loop index: the index alone does not
+            # say which basket was lost once the caller only has the returned list.
+            failed.append(event)
+            print(
+                f"  ⚠️  FFmpeg failed on clip {i}/{len(events)} "
+                f"(event @ {event.timestamp_seconds:.1f}s, frame {event.frame_index}, "
+                f"exit {result.returncode}):\n{result.stderr}"
+            )
         else:
             output_paths.append(str(out_file))
+
+    if failed:
+        # Without this the caller sees a short list and cannot tell a failed
+        # export apart from "fewer events were detected".
+        missed = ", ".join(f"{e.timestamp_seconds:.1f}s" for e in failed)
+        print(
+            f"  {len(output_paths)}/{len(events)} clips exported, "
+            f"{len(failed)} failed at: {missed}"
+        )
 
     return output_paths

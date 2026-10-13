@@ -106,7 +106,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `extract_frames` | `(video_path: str, sample_every_n: int = 1)` | 生成器，逐帧 yield `(frame_index, timestamp_seconds, frame)`。文件不存在抛 `FileNotFoundError`，无法解码抛 `RuntimeError` |
+| `extract_frames` | `(video_path: str, sample_every_n: int = 1)` | 生成器，逐帧 yield `(frame_index, timestamp_seconds, frame)`。文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError` |
 | `get_video_info` | `(video_path: str) -> dict` | 返回 `fps` / `frame_count` / `width` / `height` / `duration_seconds` |
 
 ### `detect/basket_detector.py`
@@ -131,7 +131,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败只打印警告并跳过，不中断整批 |
+| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败只打印警告并跳过，不中断整批 —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
 
 输出文件名格式：`{视频名}_basket_{序号:03d}_t{时间戳:.1f}s.mp4`
 <!-- END AUTO-GENERATED -->

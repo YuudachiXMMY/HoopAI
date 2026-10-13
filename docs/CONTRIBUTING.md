@@ -88,7 +88,7 @@ pytest --cov=. --cov-report=term-missing
 |------|--------------|
 | `events.scoring_event._box_overlap` | 纯几何函数，输入输出明确；`margin` 边界行为是误判的主要来源 |
 | `events.scoring_event.ScoringEventDetector` | 可用构造好的 `detection` 字典直接驱动，无需真实模型；覆盖 cooldown、下落帧数、球或框缺失三类分支 |
-| `ingest.frame_extractor.extract_frames` | 文件缺失与无法解码两条错误路径可直接断言异常类型 |
+| `ingest.frame_extractor.extract_frames` | 文件缺失、无法解码、fps ≤ 0 三条错误路径可直接断言异常类型（后两条需 mock `cv2.VideoCapture`） |
 
 涉及 `BasketDetector` 和 `export_clips` 的测试需要 mock（分别 mock `YOLO` 与 `subprocess.run`），否则会依赖权重文件和 FFmpeg。
 

@@ -172,6 +172,24 @@ OpenCV 无法解码该容器/编码。先确认文件完整，再转成 H.264 mp
 ffmpeg -i "输入.MOV" -c:v libx264 -crf 20 -c:a aac 输出.mp4
 ```
 
+### `RuntimeError: Video reports unusable fps (0.0)`
+
+文件能打开，但 OpenCV 读到的帧率是 0 —— 常见于可变帧率（VFR）的手机录屏/`.MOV`，或容器元数据损坏。
+所有时间戳都由 fps 推算，拿不到就无法定位进球时刻，所以这里直接抛错而不是凑一个假值
+（否则片段会被剪在错误位置，且不报错）。
+
+先确认 OpenCV 读到了什么：
+
+```bash
+python3 -c "import cv2; c=cv2.VideoCapture('输入.MOV'); print(c.get(cv2.CAP_PROP_FPS))"
+```
+
+输出 `0.0` 则转成固定帧率再跑（`-r` 强制 CFR）：
+
+```bash
+ffmpeg -i "输入.MOV" -r 30 -c:v libx264 -crf 20 -c:a aac 输出.mp4
+```
+
 ### 漏判（进球没被检出）
 
 按可能性从高到低排查：
