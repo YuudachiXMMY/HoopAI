@@ -22,8 +22,8 @@ detect.basket_detector.BasketDetector.detect(frame)
     → {"ball": det|None, "hoop": det|None, "frame_shape": (h, w)}
 events.scoring_event.ScoringEventDetector.update(frame_index, timestamp, detection)
     → ScoringEvent | None   （命中时同时追加到 .events）
-clips.clip_exporter.export_clips(video, events, output_dir, pre_roll, post_roll)
-    → List[str]（mp4 路径）
+clips.clip_exporter.export_clips(video, events, output_dir, pre_roll, post_roll, timeout)
+    → List[str]（mp4 路径，可能短于 events —— 失败的片段被跳过）
 ```
 
 阶段间契约是裸 dict，没有 schema 校验。`det` 的形状固定为
@@ -40,8 +40,10 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 brew install ffmpeg                    # clips/ 通过命令行调用 ffmpeg
 
-# 续训（args.yaml 的 resume 已指向 last.pt）
-yolo detect train resume=True model=runs/detect/data/models/basketball/weights/last.pt
+# 续训。必须显式补 data=：检查点里存的是训练机的绝对路径，本机不存在会被丢弃
+yolo detect train resume=True \
+  model=runs/detect/data/models/basketball/weights/last.pt \
+  data="$PWD/data/basketball_dataset/hoopai.yaml"
 
 # 仅跑检测，可视化标注，不做进球判定
 yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
@@ -62,9 +64,13 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
 4. **进球判定要求球和框同帧可见** —— `ScoringEventDetector.update` 中任一为 `None` 就直接返回。
    篮框被遮挡或出画的整个区间都不会产生事件。
 
-5. **数据集 YAML 路径必须相对 YAML 自身目录** —— 四个 YAML 都写成 `train: train/images` 并
-   **刻意不写 `path:`**：ultralytics 对相对 `path:` 是按 `datasets_dir` 设置解析，不是按仓库根。
-   见 [RUNBOOK](docs/RUNBOOK.md#数据集-yaml-路径)。**不要改成本机绝对路径，也不要加相对的 `path:`。**
+5. **训练时 `data=` 必须传绝对路径** —— 四个 YAML 写成 `train: train/images` 且不设 `path:`，
+   数据集根因此取自 `data=` 实参的父目录。而 `check_file` 原样返回你传入的字符串，所以相对的
+   `data=` 会让根也是相对的，继而被 ultralytics ≤8.3.133 **无条件**改写到它自己的 `datasets_dir`
+   设置下（≥8.3.134 才加了 `path.exists()` 守卫）。`requirements.txt` 允许 `>=8.0.0`，所以只有
+   `data="$PWD/..."` 在全范围成立。完整规则与源码出处见
+   [RUNBOOK](docs/RUNBOOK.md#数据集-yaml-路径)。**不要把本机绝对路径提交进 YAML。**
+   （注：省略 `path:` 与写相对 `path:` 走同一行代码，没有不对称 —— 本文件早先的相反说法已更正。）
 
 6. **模型欠训练** —— 只完成 2/20 轮，mAP50≈0.76。排查漏判时先怀疑这个，而不是判定逻辑。
 
@@ -72,7 +78,11 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
 
 8. **`.pt` 权重加载即执行代码** —— `YOLO(path)` 走 pickle 形式的 `torch.load`。权重不在仓库、无签名，
    放进 `data/models/` 的文件要和「愿意直接执行的脚本」同等对待。来源不可控时给
-   `BasketDetector(expected_sha256=...)` 传校验和。
+   `BasketDetector(expected_sha256=...)` 传校验和（校验与加载之间仍有 TOCTOU 窗口，无法消除）。
+
+9. **有两棵权重目录** —— `runs/detect/data/models/basketball/weights/` 是历史那次 2 轮训练的残留，
+   `data/models/basketball/weights/` 才是新训练的输出（`save_dir = project / name`，按 cwd 解析）。
+   从旧目录 `cp` 会静默部署 2 轮的旧权重，见 [RUNBOOK](docs/RUNBOOK.md#两棵权重目录先搞清楚谁是谁)。
 
 ## 代码风格
 

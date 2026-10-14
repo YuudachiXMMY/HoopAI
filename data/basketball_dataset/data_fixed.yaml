@@ -1,4 +1,5 @@
-# Paths relative to this file's directory — see hoopai.yaml for why `path:` is omitted.
+# Paths relative to the dataset root; pass `data=` as an absolute path.
+# See hoopai.yaml for the full rule and why no `path:` key is set.
 names:
 - basketball
 - hoop

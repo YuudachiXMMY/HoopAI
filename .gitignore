@@ -93,3 +93,6 @@ data/**
 !data/**/*.json
 !data/**/README*.txt
 !data/.gitkeep
+# Weight checksums: the only way someone receiving a .pt can verify it, since
+# the weights themselves are never committed. See docs/RUNBOOK.md.
+!data/models/CHECKSUMS.txt

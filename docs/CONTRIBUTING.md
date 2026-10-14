@@ -47,7 +47,7 @@ brew install ffmpeg        # macOS
 | 命令 | 说明 |
 |------|------|
 | `pip install -r requirements.txt` | 安装运行依赖 |
-| `yolo detect train data=data/basketball_dataset/hoopai.yaml model=yolov8n.pt epochs=20 imgsz=416 batch=4 device=cpu workers=0 patience=5 project=data/models name=basketball exist_ok=True` | 复现模型训练（参数取自上次训练的 `args.yaml`） |
+| `yolo detect train data="$PWD/data/basketball_dataset/hoopai.yaml" model=yolov8n.pt epochs=20 imgsz=416 batch=4 device=cpu workers=0 patience=5 project=data/models name=basketball exist_ok=True` | 复现模型训练（参数取自上次训练的 `args.yaml`）。在仓库根执行；`data=` 必须是绝对路径，理由见 [RUNBOOK](RUNBOOK.md#数据集-yaml-路径)。输出落在 `data/models/basketball/weights/` |
 | `yolo detect predict model=data/models/basketball.pt source=<视频路径> conf=0.35` | 仅跑检测、可视化标注结果，不做进球判定 |
 | `ffmpeg -version` | 验证 FFmpeg 可用 |
 
@@ -110,9 +110,16 @@ feat: track basketball scoring pipeline and add .gitignore
 
 提 PR 前自查：
 
-- [ ] 代码能在干净的虚拟环境中 import（`python -c "import ingest, detect, events, clips"`）
+- [ ] 语法检查通过（无需安装依赖）：`python -m compileall -q ingest detect events clips` 无输出
+- [ ] 四个模块能在装好依赖的虚拟环境中 import：
+      `python -c "import ingest.frame_extractor, detect.basket_detector, events.scoring_event, clips.clip_exporter"`
+      —— 必须点到**子模块**。四个 `__init__.py` 都是 0 字节，所以 `import ingest, detect, events, clips`
+      在依赖一个都没装的环境里也会返回 0，抓不到任何导入错误
 - [ ] 未提交被 `.gitignore` 排除的内容 —— 尤其是模型权重（`*.pt`）、视频（`*.mp4` / `*.MOV`）、数据集图片、`runs/`
-- [ ] 未提交绝对路径。数据集 YAML 里的 `train:` / `val:` / `test:` 必须是相对 YAML 自身目录的子路径，不要换成本机绝对路径，也不要加相对的 `path:`（见 [RUNBOOK · 数据集 YAML 路径](RUNBOOK.md#数据集-yaml-路径)）
+      （例外：`data/models/CHECKSUMS.txt` 已开白名单，**应当**提交）
+- [ ] 未把本机绝对路径提交进数据集 YAML 的 `train:` / `val:` / `test:` / `path:`。相对子路径 + 不设 `path:`
+      是当前约定，但务必记住它要求训练时 `data=` 传绝对路径（见
+      [RUNBOOK · 数据集 YAML 路径](RUNBOOK.md#数据集-yaml-路径)）
 - [ ] 改动了模块的公开接口 → 同步更新 README 中 `AUTO-GENERATED` 的「模块参考」表
 - [ ] 改动了 `requirements.txt` → 同步更新 README 与本文件中 `AUTO-GENERATED` 的依赖/命令表
 - [ ] 改动了默认参数 → 同步更新 README 的「调参要点」表

@@ -103,7 +103,7 @@ print(f"导出 {len(paths)} 个片段")
 | `_box_overlap(margin=)` | `1.4` | 篮框判定区域的放大系数（硬编码，非构造参数）。调大更宽容但会把擦框不进误判为进球 |
 | `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | 片段在事件时间点前后各截取的秒数。进球发生在开头 `pre_roll` 秒内时，起点截断到 0，片段相应变短，事件后仍保留 `post_roll` 秒 |
 | `export_clips(timeout=)` | `120.0` | 单个 ffmpeg 调用的墙钟上限（秒）。超时按失败处理：跳过该片段、删掉写了一半的文件、继续剪下一个。pre/post roll 调得很大或存储很慢时需调高 |
-| `BasketDetector(expected_sha256=)` | `None` | 可选。给出权重文件的 sha256 时，加载前先校验；不匹配抛 `ValueError`。默认不校验，行为与之前一致 |
+| `BasketDetector(expected_sha256=)` | `None` | 可选。给出权重文件的 sha256 时，加载前先校验；不匹配抛 `ValueError`。只有 `None` 表示跳过校验 —— 传空串或纯空白同样抛 `ValueError`（通常意味着配置读空了，静默放行比报错危险）。默认行为与之前一致 |
 
 <!-- AUTO-GENERATED: 由源码导出符号生成，勿手改 -->
 ## 模块参考
@@ -112,7 +112,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `extract_frames` | `(video_path: str, sample_every_n: int = 1) -> Iterator[Tuple[int, float, np.ndarray]]` | 生成器，逐帧 yield `(frame_index, timestamp_seconds, frame)`。文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError`；`sample_every_n < 1` 抛 `ValueError` |
+| `extract_frames` | `(video_path: str, sample_every_n: int = 1) -> Iterator[Tuple[int, float, np.ndarray]]` | 返回迭代器，逐帧产出 `(frame_index, timestamp_seconds, frame)`。**校验在调用时就执行**（函数本身不是生成器，内部另有一个生成器承载迭代），所以下列异常由调用本身抛出、不会延迟到第一次迭代：文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError`；`sample_every_n < 1` 抛 `ValueError` |
 | `get_video_info` | `(video_path: str) -> dict` | 返回 `fps` / `frame_count` / `width` / `height` / `duration_seconds` |
 
 ### `detect/basket_detector.py`
@@ -122,13 +122,15 @@ print(f"导出 {len(paths)} 个片段")
 | `ModelClass` | `IntEnum(BALL=0, HOOP=1)` | 自训练模型的类别索引，顺序对应 `data.yaml` 的 `names` |
 | `BALL_CLASS` | `= ModelClass.BALL` | `basketball` 的类别 ID（`IntEnum` 成员，与 `int` 可直接比较） |
 | `HOOP_CLASS` | `= ModelClass.HOOP` | `hoop` 的类别 ID |
-| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35, expected_sha256: Optional[str] = None)` | 加载 YOLO 权重。给出 `expected_sha256` 时先校验文件再加载，不匹配抛 `ValueError` |
+| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35, expected_sha256: Optional[str] = None)` | 加载 YOLO 权重。`expected_sha256` 非 `None` 时先校验文件再加载，不匹配或传空串抛 `ValueError` |
 | `BasketDetector.detect` | `(frame: np.ndarray) -> dict` | 返回 `{"ball": det \| None, "hoop": det \| None, "frame_shape": (h, w)}`；`det` 为 `{"box": [x1,y1,x2,y2], "confidence": float, "center": (cx, cy)}` |
 
 ### `events/scoring_event.py`
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
+| `Point` | `= Tuple[int, int]` | 像素坐标 `(cx, cy)`，与 `BasketDetector.detect` 产出的 `center` 一致 |
+| `HistoryEntry` | `= Tuple[int, float, Optional[Point], float]` | 滚动历史的一项：`(frame_index, timestamp_seconds, ball_center, confidence)`；未检出球的帧 `ball_center` 为 `None` |
 | `ScoringEvent` | `dataclass(frame_index, timestamp_seconds, confidence, ball_center)` | 单次进球事件 |
 | `ScoringEventDetector.__init__` | `(cooldown_seconds: float = 3.0, min_downward_frames: int = 3)` | 维护 30 帧滚动历史 |
 | `ScoringEventDetector.update` | `(frame_index: int, timestamp: float, detection: dict) -> ScoringEvent \| None` | 喂入一帧检测结果；命中时返回事件并追加到 `.events` |
@@ -138,7 +140,7 @@ print(f"导出 {len(paths)} 个片段")
 
 | 符号 | 签名 | 说明 |
 |------|------|------|
-| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0, timeout: float = 120.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败（非零退出或超过 `timeout`）只打印警告、删除半成品文件并跳过，不中断整批 —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
+| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0, timeout: float = 120.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败（非零退出或超过 `timeout`）只打印警告、删除**本次写出的**半成品并跳过，不中断整批（ffmpeg 若在打开输出前就失败，上一次成功导出的同名片段不会被误删） —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
 
 输出文件名格式：`{视频名}_basket_{序号:03d}_t{时间戳:.1f}s.mp4`
 <!-- END AUTO-GENERATED -->

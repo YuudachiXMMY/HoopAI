@@ -1,7 +1,18 @@
-# Paths are relative to THIS FILE's directory. ultralytics uses the YAML's own
-# parent as the dataset root when `path:` is omitted; a relative `path:` would
-# instead resolve against the `datasets_dir` setting, which is not this repo.
-# Do not replace these with machine-local absolute paths (see docs/CONTRIBUTING.md).
+# Paths below are relative to the DATASET ROOT. With no `path:` key set here,
+# ultralytics derives that root from the parent directory of whatever you pass
+# as `data=` — so pass `data=` as an ABSOLUTE path:
+#
+#   yolo detect train data="$PWD/data/basketball_dataset/hoopai.yaml" ...
+#
+# With a RELATIVE `data=`, ultralytics <=8.3.133 unconditionally relocates the
+# root under its own `datasets_dir` setting (`if not path.is_absolute()`), and
+# >=8.3.134 only escapes that when the relative root happens to exist against
+# the current working directory. requirements.txt allows >=8.0.0, so the
+# absolute form is the only one stable across the whole allowed range.
+# Verified against ultralytics check_det_dataset; see docs/RUNBOOK.md.
+#
+# Never commit machine-local absolute paths into the keys below —
+# docs/CONTRIBUTING.md's PR checklist has an item for exactly that.
 train: train/images
 val: valid/images
 test: test/images

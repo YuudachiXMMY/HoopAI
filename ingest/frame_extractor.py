@@ -14,7 +14,7 @@ def extract_frames(
     sample_every_n: int = 1,
 ) -> Iterator[Tuple[int, float, np.ndarray]]:
     """
-    Generator — yields (frame_index, timestamp_seconds, frame) for each sampled frame.
+    Returns an iterator of (frame_index, timestamp_seconds, frame) per sampled frame.
 
     Args:
         video_path:      Path to the input video file.
@@ -22,6 +22,11 @@ def extract_frames(
                          Use higher values on long videos to speed up detection.
 
     Raises:
+        These are raised by the CALL itself, not deferred to the first iteration —
+        this function validates eagerly and hands back a separate generator. Were
+        the checks inside a generator body, `extract_frames(video, 0)` would
+        return happily and only blow up later, far from the bad argument.
+
         FileNotFoundError:  video_path does not exist.
         RuntimeError:       the file could not be opened, or reports an unusable
                             frame rate (see below).
@@ -39,6 +44,7 @@ def extract_frames(
 
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
+        cap.release()
         raise RuntimeError(f"Could not open video: {video_path}")
 
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -47,7 +53,6 @@ def extract_frames(
         # damaged metadata, even when isOpened() is True. Every timestamp below
         # derives from fps, so continuing would either divide by zero or hand
         # downstream stages wrong times and cut clips at the wrong offsets.
-        # Released here explicitly: this raise is outside the try/finally below.
         cap.release()
         raise RuntimeError(
             f"Video reports unusable fps ({fps}), cannot compute timestamps: {video_path}"
@@ -61,9 +66,19 @@ def extract_frames(
     print(f"  Frames: {total_frames}")
     print(f"  Length: {duration:.1f}s")
 
+    return _iter_sampled_frames(cap, fps, sample_every_n)
+
+
+def _iter_sampled_frames(cap, fps: float, sample_every_n: int):
+    """Yield sampled frames from an already-validated, already-open capture.
+
+    Split out of extract_frames so that function can validate eagerly: a body
+    containing `yield` defers EVERY statement in it to the first next() call.
+    """
     # try/finally rather than a trailing release(): a consumer that breaks out of
     # the for-loop leaves this generator suspended at the yield, so the capture
-    # must still be released when it is closed or garbage-collected.
+    # must still be released when it is closed or garbage-collected. A caller
+    # that never iterates at all also lands here, via close() on collection.
     try:
         frame_idx = 0
         while True:

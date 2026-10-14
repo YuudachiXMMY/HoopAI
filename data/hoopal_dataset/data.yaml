@@ -1,5 +1,8 @@
-# Adjusted from the Roboflow export default (`../train/images`): this repo keeps
-# the export one directory deeper, so the payload sits beside this file.
+# Simplified from the Roboflow export default (`../train/images`). That form was
+# NOT broken: ultralytics retries without the `../` prefix when the first attempt
+# does not exist, so it already landed here. Dropping it just removes a hop.
+# Paths are relative to the dataset root — see ../basketball_dataset/hoopai.yaml
+# for how that root is derived and why `data=` must be absolute.
 # NOTE: valid/ and test/ are empty in this export — see docs/RUNBOOK.md, this
 # dataset cannot be trained on standalone.
 train: train/images

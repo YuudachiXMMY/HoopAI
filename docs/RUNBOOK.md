@@ -61,26 +61,46 @@ ls -lh output/clips/
 > **模型欠训练。** 只跑了 2/20 轮，mAP50 约 0.76 且第 2 轮 recall 从 0.73 掉到 0.64。
 > 漏判进球多半源于此，而非判定逻辑。继续训练是最直接的提升手段。
 
+### 两棵权重目录：先搞清楚谁是谁
+
+这是最容易悄悄出错的地方。
+
+| 目录 | 内容 | 怎么来的 |
+|------|------|----------|
+| `runs/detect/data/models/basketball/weights/` | **旧的 2 轮检查点**（`best.pt` / `last.pt`，各 89 MB，2026-06-12） | 历史那次被中断的训练。其 `args.yaml` 里 `save_dir` 就是这个路径 |
+| `data/models/basketball/weights/` | 新训练会写到这里 | 下面「从零重训」命令的实际输出 |
+
+为什么不一样：ultralytics 的 `save_dir` = `project / name`，而 `project` 按**当前工作目录**解析（`get_save_dir`，已核对 8.0.20 与 8.3.x 源码）。历史那次显然不是在仓库根执行的，所以 `project=data/models` 落在了 `runs/detect/` 下面。
+
+> **别照抄旧路径做 `cp`。** 那棵旧目录还在，所以从它复制**会成功但部署的是 2 轮的旧权重**，不报任何错。
+
 ### 继续训练（从中断处恢复）
 
 ```bash
-yolo detect train resume=True model=runs/detect/data/models/basketball/weights/last.pt
+yolo detect train \
+  resume=True \
+  model=runs/detect/data/models/basketball/weights/last.pt \
+  data="$PWD/data/basketball_dataset/hoopai.yaml"
 ```
 
-`args.yaml` 中 `resume` 已指向 `last.pt`，恢复会沿用原有全部超参。
+必须显式补 `data=`：检查点里存的是训练机的绝对路径
+`/Users/user/HoopAI (Execute Plan)/data/basketball_dataset/hoopai.yaml`，在本机不存在，ultralytics 会丢弃它。
+除 `data` 外其余超参沿用检查点里的记录。
 
 ### 从零重训
 
-先确认数据集图片目录已就位（[§4](#数据集-yaml-路径)），然后：
+先确认数据集图片目录已就位（[§4](#数据集-yaml-路径)），然后在**仓库根**执行：
 
 ```bash
 yolo detect train \
-  data=data/basketball_dataset/hoopai.yaml \
+  data="$PWD/data/basketball_dataset/hoopai.yaml" \
   model=yolov8n.pt \
   epochs=20 imgsz=416 batch=4 \
   device=cpu workers=0 patience=5 \
   project=data/models name=basketball exist_ok=True
 ```
+
+`data=` 用绝对路径的理由见 [§4](#数据集-yaml-路径)。输出落在 `data/models/basketball/weights/`。
 
 CPU 上按实测速度，20 轮需数十小时。有 GPU 时改 `device=0 workers=8`，并可提高 `batch` 与 `imgsz`。
 
@@ -90,12 +110,16 @@ CPU 上按实测速度，20 轮需数十小时。有 GPU 时改 `device=0 worker
 # 备份现有权重（带时间戳，便于回滚）
 cp data/models/basketball.pt "data/models/basketball.pt.bak.$(date +%Y%m%d-%H%M%S)"
 
-# 用新的 best.pt 替换
-cp runs/detect/data/models/basketball/weights/best.pt data/models/basketball.pt
+# 用上面那条训练命令刚产出的 best.pt 替换。
+# 先确认 mtime 是本次训练的，别拿到上表那棵旧目录里的 2 轮权重。
+ls -l data/models/basketball/weights/best.pt
+cp data/models/basketball/weights/best.pt data/models/basketball.pt
 
-# 记下校验和：权重不在 git 里，这是之后唯一能确认文件没被换过的依据
+# 记下校验和，供 BasketDetector(expected_sha256=...) 校验
 shasum -a 256 data/models/basketball.pt | tee -a data/models/CHECKSUMS.txt
 ```
+
+`CHECKSUMS.txt` 已在 `.gitignore` 里开了白名单（`!data/models/CHECKSUMS.txt`），**需要提交**才能让拿到权重的人核对——否则它只是本机记录，分发权重时必须另走带外渠道告知校验和。
 
 替换后必须用已知有进球的视频回归验证一遍，确认检出数量没有下降。
 
@@ -141,9 +165,37 @@ git revert <commit>     # 已推送的提交用 revert
 
 ### 数据集 YAML 路径
 
-> 此前四个 YAML 的路径全部失效，现已修复。**别改回绝对路径。**
+**症状：** `yolo detect train` 报找不到数据集，或图片数为 0。
 
-四个 dataset YAML 的 `train:` / `val:` / `test:` 现在都是**相对 YAML 自身所在目录**的子路径：
+**关键结论：把 `data=` 传成绝对路径。**
+
+```bash
+yolo detect train data="$PWD/data/basketball_dataset/hoopai.yaml" ...
+```
+
+#### ultralytics 实际的解析规则
+
+以下逐条核对过上游 `check_det_dataset`（`ultralytics/data/utils.py`，查了 v8.2.0 / v8.3.133 / v8.3.134 / main）与 `check_file`（`ultralytics/utils/checks.py`）：
+
+```python
+path = Path(extract_dir or data.get("path") or Path(data.get("yaml_file", "")).parent)
+if not path.is_absolute():                      # <= 8.3.133
+    path = (DATASETS_DIR / path).resolve()
+# >= 8.3.134 改为： if not path.exists() and not path.is_absolute():
+```
+
+1. **数据集根** = `path:`（若 YAML 里有），否则 = `data=` 实参的**父目录字符串**。
+2. `check_file()` 在文件已存在时**原样返回你传入的字符串**，不转绝对路径。所以传相对的 `data=` 时，根也是相对的。
+3. 根是相对路径时：**≤ 8.3.133 无条件**改写到 ultralytics 自己的 `datasets_dir` 设置下；**≥ 8.3.134** 只在该相对路径对当前工作目录不存在时才改写。
+4. 根是绝对路径时，两种版本都原样使用。
+
+`requirements.txt` 只写 `ultralytics>=8.0.0`，涵盖 ≤8.3.133，所以**绝对 `data=` 是唯一在整个允许范围内都成立的形式**。相对 `data=` 要求同时满足「≥8.3.134」且「在仓库根执行」。
+
+> **更正：** 本仓库早先的文档曾声称「省略 `path:` 会回退到 YAML 自身父目录（绝对路径），而相对 `path:` 才按 `datasets_dir` 解析」。**这是错的**——两者走的是同一行代码（上面第 1 行的 `or`），没有任何不对称；而且回退得到的父目录与 `data=` 实参一样是相对的，不是绝对的。因此 `docs/CONTRIBUTING.md` 与 `CLAUDE.md` 里「不要加相对 `path:`」那条禁令也随之放宽：真正要避免的是**提交本机绝对路径**，以及**依赖相对 `data=`**。
+
+#### YAML 当前内容
+
+四个 YAML 都不设 `path:`，键值为相对数据集根的子路径：
 
 ```yaml
 train: train/images
@@ -151,13 +203,11 @@ val: valid/images
 test: test/images
 ```
 
-**为什么省略 `path:`：** ultralytics 解析 `path:` 的规则是 —— 绝对路径按原样用；**相对路径按 `datasets_dir` 设置解析，不是按仓库根**。所以 `path: data/basketball_dataset` 只在 `datasets_dir` 恰好等于仓库根时才成立，换机器就断。完全省掉 `path:` 时 ultralytics 回退到 YAML 文件自身的父目录（绝对路径），这才是跨机器稳定的写法。
+本机的 `data/basketball_dataset/{train,valid,test}/images/` 确实存在（1218 / 114 / 57 张），与上面的写法一致。
 
-> 本仓库没装 ultralytics、数据集图片也不在版本控制里，所以上面的写法**没有跑一次真实训练验证过**，只是依据 ultralytics 的路径解析规则推出的。第一次重训时若仍报图片数为 0，先确认 `data/basketball_dataset/{train,valid,test}/images/` 确实存在（需从 Roboflow 重新下载）。
+**此前的问题**（`git log` 可查）：`hoopai.yaml` 与 `data_fixed.yaml` 写的是另一台机器的绝对路径 `/Users/user/HoopAI (Execute Plan)/...`，那是真实故障。至于两个 `data.yaml` 原本的 `../train/images` —— 它**并没有坏**：`check_det_dataset` 在首次拼接的路径不存在时会去掉 `../` 再试一次（上述所有版本都有这段回退），所以它本来就能解析到位。那两处改动只是去掉一次多余跳转，不是 bug 修复。
 
-**此前的问题**（`git log` 可查）：`hoopai.yaml` 与 `data_fixed.yaml` 写的是另一台机器的绝对路径 `/Users/user/HoopAI (Execute Plan)/...`；两个 `data.yaml` 沿用 Roboflow 导出默认的 `../train/images`，而本仓库把导出内容多放了一层，于是解析到不存在的 `data/train/images`。
-
-**不要**把本机绝对路径提交回仓库 —— `docs/CONTRIBUTING.md` 的 PR 清单对此有一条自查项。
+**不要**把本机绝对路径提交进 YAML —— `docs/CONTRIBUTING.md` 的 PR 清单对此有一条自查项。
 
 ### `hoopal_dataset` 没有验证集
 
@@ -245,10 +295,11 @@ ffmpeg -i "输入.MOV" -r 30 -c:v libx264 -crf 20 -c:a aac 输出.mp4
 |------|------|------|
 | 没有流水线入口脚本 | 每次使用都要手写串联代码 | 仓库根目录 |
 | 模型只训练了 2/20 轮 | 漏判率偏高 | `data/models/basketball.pt` |
-| 数据集 YAML 路径改成相对写法后未经真实训练验证 | 重训前需先确认图片目录存在 | `data/*_dataset/*.yaml` |
+| 数据集路径依赖调用方式：`data=` 必须传绝对路径 | 用相对 `data=` 且 ultralytics < 8.3.134 时训练直接失败 | `data/*_dataset/*.yaml`、[§4](#数据集-yaml-路径) |
+| 两棵权重目录并存，旧的那棵还留着 2 轮的检查点 | 照抄旧路径 `cp` 会静默部署旧权重 | `runs/detect/data/models/` 与 `data/models/` |
 | 类别索引硬编码，且不校验模型实际类别名 | 换模型时若类别顺序变化会静默出错 | `detect/basket_detector.py` 的 `ModelClass` |
-| 权重加载走 pickle，无签名；校验和需手工传入 | 来源不可控的 `.pt` 加载即执行任意代码 | `detect/basket_detector.py` 的 `BasketDetector.__init__` |
-| `_box_overlap` 的 `margin` 不可配置 | 调误报率需改源码 | `events/scoring_event.py:20` |
+| 权重加载走 pickle，无签名；校验和需手工传入，且校验与加载之间有 TOCTOU 窗口 | 来源不可控的 `.pt` 加载即执行任意代码 | `detect/basket_detector.py` 的 `BasketDetector.__init__` |
+| `_box_overlap` 的 `margin` 不可配置 | 调误报率需改源码 | `events/scoring_event.py` 的 `_box_overlap` |
 | 没有测试 | 改动判定逻辑无回归保护 | 全仓库 |
 | `tqdm` 在依赖中但未使用 | 无进度条，长视频无进展反馈 | `requirements.txt` |
 | 无日志，全部用 `print` | 无法按级别过滤或留存运行记录 | 全仓库 |

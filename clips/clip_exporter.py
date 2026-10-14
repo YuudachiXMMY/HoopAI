@@ -18,12 +18,31 @@ def _check_ffmpeg():
         )
 
 
-def _remove_partial(out_file: Path) -> None:
+def _fingerprint(out_file: Path):
+    """(mtime_ns, size) of an existing file, or None when it is absent."""
+    try:
+        st = out_file.stat()
+    except OSError:
+        return None
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _remove_partial(out_file: Path, before) -> None:
     """Drop the truncated file a killed or failed ffmpeg leaves behind.
 
     Failed clips are absent from the returned list, so without this the output
     directory still holds an unplayable mp4 that looks like a real highlight.
+
+    Only removes what THIS invocation wrote: ffmpeg can fail before it ever
+    opens the output (unparseable argument, unreadable input), and in that case
+    a clip left by an earlier successful run is still intact — deleting it would
+    destroy good output over an unrelated failure. `before` is the fingerprint
+    taken just before the ffmpeg call; an unchanged file is left alone.
     """
+    after = _fingerprint(out_file)
+    if after is None or (before is not None and after == before):
+        return
+
     try:
         out_file.unlink(missing_ok=True)
     except OSError:
@@ -83,6 +102,9 @@ def export_clips(
         ]
 
         print(f"  Exporting clip {i}/{len(events)}: {out_file.name}")
+        # Taken before the call so cleanup can tell "ffmpeg truncated this" from
+        # "an earlier run left a finished clip here and ffmpeg never touched it".
+        before = _fingerprint(out_file)
         try:
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=timeout
@@ -92,7 +114,7 @@ def export_clips(
             # hung decoder) blocks this sequential loop forever and prints
             # nothing further, so the whole batch hangs with no diagnosis.
             failed.append(event)
-            _remove_partial(out_file)
+            _remove_partial(out_file, before)
             print(
                 f"  ⚠️  FFmpeg timed out after {timeout:.0f}s on clip "
                 f"{i}/{len(events)} (event @ {event.timestamp_seconds:.1f}s, "
@@ -104,7 +126,7 @@ def export_clips(
             # Name the event, not just the loop index: the index alone does not
             # say which basket was lost once the caller only has the returned list.
             failed.append(event)
-            _remove_partial(out_file)
+            _remove_partial(out_file, before)
             print(
                 f"  ⚠️  FFmpeg failed on clip {i}/{len(events)} "
                 f"(event @ {event.timestamp_seconds:.1f}s, frame {event.frame_index}, "

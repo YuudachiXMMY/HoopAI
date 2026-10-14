@@ -35,17 +35,34 @@ def _verify_sha256(model_path: str, expected: str) -> None:
 
     Read in chunks rather than all at once: checkpoints can be arbitrarily large
     and this runs before anything else in __init__.
+
+    Residual limitation: this hashes the file by name and YOLO() then reopens it
+    by name, so a writer that swaps the file in between is not caught. Closing
+    that window would need the loader to accept an open descriptor, which
+    ultralytics does not. It raises the bar from "any file at this path" to
+    "the file at this path at check time"; it is not a substitute for only
+    putting trusted weights in data/models/.
     """
+    expected = expected.strip().lower()
+    if not expected:
+        # Supplying "" almost always means a config or env lookup came back
+        # empty, i.e. the caller believes verification is on. Failing loudly
+        # beats silently loading an unverified pickle.
+        raise ValueError(
+            "expected_sha256 was supplied but blank — refusing to load unverified. "
+            "Pass None to skip verification deliberately."
+        )
+
     digest = hashlib.sha256()
     with Path(model_path).open("rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             digest.update(chunk)
 
     actual = digest.hexdigest()
-    if actual != expected.lower():
+    if actual != expected:
         raise ValueError(
             f"Model checksum mismatch for {model_path}: "
-            f"expected {expected.lower()}, got {actual}"
+            f"expected {expected}, got {actual}"
         )
 
 
@@ -60,7 +77,11 @@ class BasketDetector:
         # code embedded in the file. The weights are not in the repo (see RUNBOOK)
         # and carry no signature, so pass expected_sha256 whenever they came from
         # anywhere you would not run an arbitrary script from.
-        if expected_sha256:
+        #
+        # `is not None`, not truthiness: a caller wiring this from an env var or
+        # config value that resolves to "" means "verify", and a truthiness test
+        # would hand them the no-verification path without a word.
+        if expected_sha256 is not None:
             _verify_sha256(model_path, expected_sha256)
 
         print(f"  Loading custom basketball model ({model_path}) ...")
