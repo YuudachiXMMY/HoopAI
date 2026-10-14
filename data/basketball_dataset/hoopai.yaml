@@ -9,7 +9,8 @@
 # >=8.3.134 only escapes that when the relative root happens to exist against
 # the current working directory. requirements.txt allows >=8.0.0, so the
 # absolute form is the only one stable across the whole allowed range.
-# Verified against ultralytics check_det_dataset; see docs/RUNBOOK.md.
+# Measured on 8.4.177 and 8.3.133 against the real payload, not just read from
+# the source — the result table is in docs/RUNBOOK.md.
 #
 # Never commit machine-local absolute paths into the keys below —
 # docs/CONTRIBUTING.md's PR checklist has an item for exactly that.

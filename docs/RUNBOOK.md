@@ -191,6 +191,19 @@ if not path.is_absolute():                      # <= 8.3.133
 
 `requirements.txt` 只写 `ultralytics>=8.0.0`，涵盖 ≤8.3.133，所以**绝对 `data=` 是唯一在整个允许范围内都成立的形式**。相对 `data=` 要求同时满足「≥8.3.134」且「在仓库根执行」。
 
+#### 实测结果
+
+不只是读源码——用真实的 1218 / 114 / 57 张图片，对两个版本各跑了一遍 `check_det_dataset`：
+
+| ultralytics | `data=` 绝对路径 | `data=` 相对路径（cwd = 仓库根） | `data=` 相对路径（cwd 在别处） |
+|-------------|------------------|----------------------------------|--------------------------------|
+| 8.4.177 | ✅ 解析正确 | ✅ 解析正确（`path.exists()` 守卫生效） | ❌ 连 YAML 文件都找不到 |
+| 8.3.133 | ✅ 解析正确 | ❌ `missing path '<datasets_dir>/data/basketball_dataset/valid/images'` | ❌ 连 YAML 文件都找不到 |
+
+8.3.133 那格的报错原文就是 `DATASETS_DIR / path` 拼接的结果，与上面的源码一致。**绝对 `data=` 是三种情形里唯一全绿的一列。**
+
+顺带一个容易踩的点：`datasets_dir` 默认值**不是**固定的 —— 本机实测 8.4.177 读到 `~/Desktop/datasets`，而旁装的 8.3.133 重置设置后读到 `<cwd>/datasets`。别指望它指向任何特定位置。
+
 > **更正：** 本仓库早先的文档曾声称「省略 `path:` 会回退到 YAML 自身父目录（绝对路径），而相对 `path:` 才按 `datasets_dir` 解析」。**这是错的**——两者走的是同一行代码（上面第 1 行的 `or`），没有任何不对称；而且回退得到的父目录与 `data=` 实参一样是相对的，不是绝对的。因此 `docs/CONTRIBUTING.md` 与 `CLAUDE.md` 里「不要加相对 `path:`」那条禁令也随之放宽：真正要避免的是**提交本机绝对路径**，以及**依赖相对 `data=`**。
 
 #### YAML 当前内容
@@ -203,7 +216,7 @@ val: valid/images
 test: test/images
 ```
 
-本机的 `data/basketball_dataset/{train,valid,test}/images/` 确实存在（1218 / 114 / 57 张），与上面的写法一致。
+本机的 `data/basketball_dataset/{train,valid,test}/images/` 确实存在（1218 / 114 / 57 张），上表的实测就是对着这份真实数据跑的。
 
 **此前的问题**（`git log` 可查）：`hoopai.yaml` 与 `data_fixed.yaml` 写的是另一台机器的绝对路径 `/Users/user/HoopAI (Execute Plan)/...`，那是真实故障。至于两个 `data.yaml` 原本的 `../train/images` —— 它**并没有坏**：`check_det_dataset` 在首次拼接的路径不存在时会去掉 `../` 再试一次（上述所有版本都有这段回退），所以它本来就能解析到位。那两处改动只是去掉一次多余跳转，不是 bug 修复。
 

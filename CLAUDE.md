@@ -68,7 +68,7 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
    数据集根因此取自 `data=` 实参的父目录。而 `check_file` 原样返回你传入的字符串，所以相对的
    `data=` 会让根也是相对的，继而被 ultralytics ≤8.3.133 **无条件**改写到它自己的 `datasets_dir`
    设置下（≥8.3.134 才加了 `path.exists()` 守卫）。`requirements.txt` 允许 `>=8.0.0`，所以只有
-   `data="$PWD/..."` 在全范围成立。完整规则与源码出处见
+   `data="$PWD/..."` 在全范围成立 —— 已在 8.4.177 与 8.3.133 上对真实数据实测，结果表与源码出处见
    [RUNBOOK](docs/RUNBOOK.md#数据集-yaml-路径)。**不要把本机绝对路径提交进 YAML。**
    （注：省略 `path:` 与写相对 `path:` 走同一行代码，没有不对称 —— 本文件早先的相反说法已更正。）
 
