@@ -61,18 +61,21 @@ ls -lh output/clips/
 > **模型欠训练。** 只跑了 2/20 轮，mAP50 约 0.76 且第 2 轮 recall 从 0.73 掉到 0.64。
 > 漏判进球多半源于此，而非判定逻辑。继续训练是最直接的提升手段。
 
-### 两棵权重目录：先搞清楚谁是谁
+### 权重输出路径：用绝对 `project=`
 
-这是最容易悄悄出错的地方。
+和 `data=` 同一个教训：**相对的 `project=` 落点随 ultralytics 版本变**。实测 `get_save_dir`：
 
-| 目录 | 内容 | 怎么来的 |
-|------|------|----------|
-| `runs/detect/data/models/basketball/weights/` | **旧的 2 轮检查点**（`best.pt` / `last.pt`，各 89 MB，2026-06-12） | 历史那次被中断的训练。其 `args.yaml` 里 `save_dir` 就是这个路径 |
-| `data/models/basketball/weights/` | 新训练会写到这里 | 下面「从零重训」命令的实际输出 |
+| ultralytics | `project=data/models`（相对） | `project="$PWD/data/models"`（绝对） |
+|-------------|-------------------------------|--------------------------------------|
+| 8.3.133 | `data/models/<name>` —— 相对 cwd | `<仓库根>/data/models/<name>` |
+| 8.4.177 | `runs/detect/data/models/<name>` —— 被嵌进 `runs_dir/<task>/` | `<仓库根>/data/models/<name>` |
 
-为什么不一样：ultralytics 的 `save_dir` = `project / name`，而 `project` 按**当前工作目录**解析（`get_save_dir`，已核对 8.0.20 与 8.3.x 源码）。历史那次显然不是在仓库根执行的，所以 `project=data/models` 落在了 `runs/detect/` 下面。
+8.4.x 的 `get_save_dir` 多了一步：`if not Path(project).is_absolute(): project = Path(SETTINGS["runs_dir"]) / task / project`。绝对路径跳过这一步，两版一致。
 
-> **别照抄旧路径做 `cp`。** 那棵旧目录还在，所以从它复制**会成功但部署的是 2 轮的旧权重**，不报任何错。
+所以下面的训练命令一律写 `project="$PWD/data/models"`，输出确定落在 `data/models/<name>/weights/`。
+（注：历史 `args.yaml` 记录的是相对的 `project: data/models`，这里有意偏离，换取落点可预测。）
+
+**现存的那棵旧目录：** `runs/detect/data/models/basketball/weights/` 里是历史那次中断训练的 **2 轮检查点**（`best.pt` / `last.pt`，各 89 MB，2026-06-12），与 8.4.x 的相对-project 行为吻合。用上面的绝对 `project=` 重训时**不会覆盖它**，所以别从那里 `cp` —— 会成功但部署的是旧权重，不报任何错。续训要从它恢复则是对的（那才是中断点）。
 
 ### 继续训练（从中断处恢复）
 
@@ -97,10 +100,12 @@ yolo detect train \
   model=yolov8n.pt \
   epochs=20 imgsz=416 batch=4 \
   device=cpu workers=0 patience=5 \
-  project=data/models name=basketball exist_ok=True
+  project="$PWD/data/models" name=basketball exist_ok=True
 ```
 
-`data=` 用绝对路径的理由见 [§4](#数据集-yaml-路径)。输出落在 `data/models/basketball/weights/`。
+`data=` 与 `project=` 都用绝对路径的理由见 [§4](#数据集-yaml-路径) 与
+[上文](#权重输出路径用绝对-project)。输出确定落在 `data/models/basketball/weights/`。
+ultralytics 启动时也会把实际的 `save_dir` 打印出来，照它复制最稳妥。
 
 CPU 上按实测速度，20 轮需数十小时。有 GPU 时改 `device=0 workers=8`，并可提高 `batch` 与 `imgsz`。
 
@@ -110,8 +115,8 @@ CPU 上按实测速度，20 轮需数十小时。有 GPU 时改 `device=0 worker
 # 备份现有权重（带时间戳，便于回滚）
 cp data/models/basketball.pt "data/models/basketball.pt.bak.$(date +%Y%m%d-%H%M%S)"
 
-# 用上面那条训练命令刚产出的 best.pt 替换。
-# 先确认 mtime 是本次训练的，别拿到上表那棵旧目录里的 2 轮权重。
+# 用上面那条训练命令刚产出的 best.pt 替换。路径应与训练启动时打印的 save_dir 一致；
+# 先看 mtime 确认是本次训练的，别拿到 runs/detect/... 那棵旧目录里的 2 轮权重。
 ls -l data/models/basketball/weights/best.pt
 cp data/models/basketball/weights/best.pt data/models/basketball.pt
 
@@ -309,7 +314,7 @@ ffmpeg -i "输入.MOV" -r 30 -c:v libx264 -crf 20 -c:a aac 输出.mp4
 | 没有流水线入口脚本 | 每次使用都要手写串联代码 | 仓库根目录 |
 | 模型只训练了 2/20 轮 | 漏判率偏高 | `data/models/basketball.pt` |
 | 数据集路径依赖调用方式：`data=` 必须传绝对路径 | 用相对 `data=` 且 ultralytics < 8.3.134 时训练直接失败 | `data/*_dataset/*.yaml`、[§4](#数据集-yaml-路径) |
-| 两棵权重目录并存，旧的那棵还留着 2 轮的检查点 | 照抄旧路径 `cp` 会静默部署旧权重 | `runs/detect/data/models/` 与 `data/models/` |
+| 相对 `project=` 的输出落点随 ultralytics 版本变；旧目录还留着 2 轮检查点 | 从旧路径 `cp` 会静默部署旧权重 | `runs/detect/data/models/` 与 `data/models/`，[§2](#权重输出路径用绝对-project) |
 | 类别索引硬编码，且不校验模型实际类别名 | 换模型时若类别顺序变化会静默出错 | `detect/basket_detector.py` 的 `ModelClass` |
 | 权重加载走 pickle，无签名；校验和需手工传入，且校验与加载之间有 TOCTOU 窗口 | 来源不可控的 `.pt` 加载即执行任意代码 | `detect/basket_detector.py` 的 `BasketDetector.__init__` |
 | `_box_overlap` 的 `margin` 不可配置 | 调误报率需改源码 | `events/scoring_event.py` 的 `_box_overlap` |

@@ -47,7 +47,7 @@ brew install ffmpeg        # macOS
 | 命令 | 说明 |
 |------|------|
 | `pip install -r requirements.txt` | 安装运行依赖 |
-| `yolo detect train data="$PWD/data/basketball_dataset/hoopai.yaml" model=yolov8n.pt epochs=20 imgsz=416 batch=4 device=cpu workers=0 patience=5 project=data/models name=basketball exist_ok=True` | 复现模型训练（参数取自上次训练的 `args.yaml`）。在仓库根执行；`data=` 必须是绝对路径，理由见 [RUNBOOK](RUNBOOK.md#数据集-yaml-路径)。输出落在 `data/models/basketball/weights/` |
+| `yolo detect train data="$PWD/data/basketball_dataset/hoopai.yaml" model=yolov8n.pt epochs=20 imgsz=416 batch=4 device=cpu workers=0 patience=5 project="$PWD/data/models" name=basketball exist_ok=True` | 复现模型训练（超参取自上次训练的 `args.yaml`）。在仓库根执行；`data=` 与 `project=` 都必须是绝对路径，否则落点随 ultralytics 版本变 —— 理由与实测见 [RUNBOOK](RUNBOOK.md#数据集-yaml-路径)。输出落在 `data/models/basketball/weights/` |
 | `yolo detect predict model=data/models/basketball.pt source=<视频路径> conf=0.35` | 仅跑检测、可视化标注结果，不做进球判定 |
 | `ffmpeg -version` | 验证 FFmpeg 可用 |
 

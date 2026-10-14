@@ -80,9 +80,11 @@ yolo detect predict model=data/models/basketball.pt source=<视频> conf=0.35
    放进 `data/models/` 的文件要和「愿意直接执行的脚本」同等对待。来源不可控时给
    `BasketDetector(expected_sha256=...)` 传校验和（校验与加载之间仍有 TOCTOU 窗口，无法消除）。
 
-9. **有两棵权重目录** —— `runs/detect/data/models/basketball/weights/` 是历史那次 2 轮训练的残留，
-   `data/models/basketball/weights/` 才是新训练的输出（`save_dir = project / name`，按 cwd 解析）。
-   从旧目录 `cp` 会静默部署 2 轮的旧权重，见 [RUNBOOK](docs/RUNBOOK.md#两棵权重目录先搞清楚谁是谁)。
+9. **`project=` 也要传绝对路径** —— 相对的 `project` 落点随版本变：8.3.133 按 cwd 解析成
+   `data/models/<name>`，8.4.177 则嵌进 `runs_dir/<task>/` 成 `runs/detect/data/models/<name>`
+   （两者均已实测）。绝对路径两版一致。另外 `runs/detect/data/models/basketball/weights/` 里是
+   历史那次 2 轮训练的残留，从它 `cp` 会静默部署旧权重，
+   见 [RUNBOOK](docs/RUNBOOK.md#权重输出路径用绝对-project)。
 
 ## 代码风格
 
