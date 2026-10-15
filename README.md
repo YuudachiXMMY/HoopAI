@@ -1,69 +1,72 @@
 # HoopAI
 
-从一段篮球视频中自动找出进球瞬间，并剪出高光片段。
+Automatically find the scoring moments in a basketball video and cut out highlight clips.
 
-流程基于自训练的 YOLOv8 双类检测模型（`basketball` / `hoop`）。进球判定不依赖固定机位：它直接用检测到的篮框位置，判断球心是否进入篮框区域且正在下落，因此换角度拍摄也能工作。
+The pipeline is built on a custom-trained YOLOv8 two-class detection model (`basketball` / `hoop`). Scoring detection does not depend on a fixed camera position: it uses the detected hoop location directly and checks whether the ball center enters the hoop region while moving downward, so it also works when the camera angle changes.
 
-## 流水线
+## Pipeline
 
 ```
-视频文件
+video file
    │
-   ├─▶ ingest.frame_extractor.extract_frames        抽帧 + 时间戳
+   ├─▶ ingest.frame_extractor.extract_frames        frame sampling + timestamps
    │
-   ├─▶ detect.basket_detector.BasketDetector        每帧检测球与篮框
+   ├─▶ detect.basket_detector.BasketDetector        detect ball and hoop per frame
    │
-   ├─▶ events.scoring_event.ScoringEventDetector    球入框 + 下落 → 进球事件
+   ├─▶ events.scoring_event.ScoringEventDetector    ball in hoop + downward → scoring event
    │
-   └─▶ clips.clip_exporter.export_clips             FFmpeg 按事件时间剪片
+   └─▶ clips.clip_exporter.export_clips             FFmpeg cuts clips at event times
                                                          │
                                                          ▼
-                                                   高光 mp4 片段
+                                                   highlight mp4 clips
 ```
 
-> **当前状态：没有统一入口。** 仓库里只有上面四个模块，没有 `main.py`、没有 CLI、没有测试。
-> 要跑通整条流水线，需要自己按下面的「用法」把四步串起来，或新建一个入口脚本。
+> **Current status: there is no unified entry point.** The repository contains only the four modules
+> above — no `main.py`, no CLI, no tests. To run the whole pipeline you have to wire the four steps
+> together yourself as shown in [Usage](#usage) below, or write a new entry script.
 
-## 环境准备
+## Environment setup
 
-前置条件：
+Prerequisites:
 
-| 依赖 | 版本 | 说明 |
-|------|------|------|
-| Python | 3.11+ | 本机实测 3.12.13；仓库中残留的 `__pycache__` 是 3.11 编译的，可安全删除 |
-| FFmpeg | 任意近期版本 | `clips.clip_exporter` 直接调用 `ffmpeg` 命令行，缺失会抛 `OSError` |
+| Dependency | Version | Notes |
+|------------|---------|-------|
+| Python | 3.11+ | Verified locally on 3.12.13; the leftover `__pycache__` in the repo was compiled by 3.11 and can safely be deleted |
+| FFmpeg | any recent version | `clips.clip_exporter` invokes the `ffmpeg` command line directly; if it is missing it raises `OSError` |
 
-安装：
+Install:
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# macOS 安装 FFmpeg
+# Install FFmpeg on macOS
 brew install ffmpeg
 ```
 
-<!-- AUTO-GENERATED: 由 requirements.txt 生成，勿手改 -->
-### Python 依赖
+<!-- AUTO-GENERATED: generated from requirements.txt — do not edit by hand -->
+### Python dependencies
 
-| 包 | 版本约束 | 用途 |
-|----|----------|------|
-| `ultralytics` | `>=8.0.0` | YOLOv8 模型加载与推理（`detect/`） |
-| `opencv-python` | `>=4.8.0` | 视频解码与抽帧（`ingest/`） |
-| `numpy` | `>=1.24.0` | 帧数组类型 |
-| `tqdm` | `>=4.65.0` | 进度条（当前代码未实际引用） |
+| Package | Version constraint | Purpose |
+|---------|--------------------|---------|
+| `ultralytics` | `>=8.0.0` | YOLOv8 model loading and inference (`detect/`) |
+| `opencv-python` | `>=4.8.0` | Video decoding and frame extraction (`ingest/`) |
+| `numpy` | `>=1.24.0` | Frame array types |
+| `tqdm` | `>=4.65.0` | Progress bars (not actually referenced by the current code) |
 <!-- END AUTO-GENERATED -->
 
-模型权重位于 `data/models/basketball.pt`（已被 `.gitignore` 排除，不在仓库中，需本地自备或重新训练 —— 见 [docs/RUNBOOK.md](docs/RUNBOOK.md)）。
+The model weights live at `data/models/basketball.pt` (excluded by `.gitignore`, so they are not in the
+repository — supply them locally or retrain, see [docs/RUNBOOK.md](docs/RUNBOOK.md)).
 
-> 加载 `.pt` 会执行文件内嵌的代码（pickle 形式的 `torch.load`），所以只放信得过来源的权重；
-> 来源不完全可控时用 `BasketDetector(expected_sha256=...)` 先校验 —— 见
-> [RUNBOOK · 权重文件的信任边界](docs/RUNBOOK.md#权重文件的信任边界)。
+> Loading a `.pt` executes code embedded in the file (pickle-based `torch.load`), so only place weights
+> from a source you trust. When the source is not fully under your control, verify first with
+> `BasketDetector(expected_sha256=...)` — see
+> [RUNBOOK · Trust boundary for weight files](docs/RUNBOOK.md#trust-boundary-for-weight-files).
 
-## 用法
+## Usage
 
-目前需要手动串联四个模块：
+For now the four modules have to be wired together by hand:
 
 ```python
 from ingest.frame_extractor import extract_frames
@@ -80,7 +83,7 @@ for frame_idx, timestamp, frame in extract_frames(video, sample_every_n=1):
     detection = detector.detect(frame)
     event = scorer.update(frame_idx, timestamp, detection)
     if event:
-        print(f"进球 @ {event.timestamp_seconds:.1f}s (conf={event.confidence:.2f})")
+        print(f"Basket @ {event.timestamp_seconds:.1f}s (conf={event.confidence:.2f})")
 
 paths = export_clips(
     video,
@@ -89,76 +92,77 @@ paths = export_clips(
     pre_roll=4.0,
     post_roll=2.0,
 )
-print(f"导出 {len(paths)} 个片段")
+print(f"Exported {len(paths)} clips")
 ```
 
-### 调参要点
+### Tuning parameters
 
-| 参数 | 默认值 | 影响 |
-|------|--------|------|
-| `extract_frames(sample_every_n=)` | `1` | 抽帧步长。调大可加速，但会稀释下落轨迹 —— `ScoringEventDetector` 的 `min_downward_frames` 统计的是**被采样帧**，`sample_every_n` 调大时需同步调小 `min_downward_frames`，否则会漏判 |
-| `BasketDetector(confidence=)` | `0.35` | 检测置信度阈值。低于此值的框被丢弃；每帧只保留置信度最高的一个球和一个框 |
-| `ScoringEventDetector(cooldown_seconds=)` | `3.0` | 两次进球事件的最小间隔，用于抑制同一次进球被重复计数 |
-| `ScoringEventDetector(min_downward_frames=)` | `3` | 判定「球在下落」所需的连续下降帧数 |
-| `_box_overlap(margin=)` | `1.4` | 篮框判定区域的放大系数（硬编码，非构造参数）。调大更宽容但会把擦框不进误判为进球 |
-| `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | 片段在事件时间点前后各截取的秒数。进球发生在开头 `pre_roll` 秒内时，起点截断到 0，片段相应变短，事件后仍保留 `post_roll` 秒 |
-| `export_clips(timeout=)` | `120.0` | 单个 ffmpeg 调用的墙钟上限（秒）。超时按失败处理：跳过该片段、删掉写了一半的文件、继续剪下一个。pre/post roll 调得很大或存储很慢时需调高 |
-| `BasketDetector(expected_sha256=)` | `None` | 可选。给出权重文件的 sha256 时，加载前先校验；不匹配抛 `ValueError`。只有 `None` 表示跳过校验 —— 传空串或纯空白同样抛 `ValueError`（通常意味着配置读空了，静默放行比报错危险）。默认行为与之前一致 |
+| Parameter | Default | Effect |
+|-----------|---------|--------|
+| `extract_frames(sample_every_n=)` | `1` | Frame sampling stride. Raising it speeds things up but thins out the downward trajectory — `ScoringEventDetector`'s `min_downward_frames` counts **sampled frames**, so when you raise `sample_every_n` you must lower `min_downward_frames` accordingly or baskets will be missed |
+| `BasketDetector(confidence=)` | `0.35` | Detection confidence threshold. Boxes below it are discarded; only the single highest-confidence ball and hoop are kept per frame |
+| `ScoringEventDetector(cooldown_seconds=)` | `3.0` | Minimum interval between two scoring events, used to suppress counting the same basket twice |
+| `ScoringEventDetector(min_downward_frames=)` | `3` | Number of consecutive descending frames required to decide the ball "is falling" |
+| `_box_overlap(margin=)` | `1.4` | Scale factor applied to the hoop decision region (hardcoded, not a constructor parameter). Raising it is more permissive but will count rim-outs as baskets |
+| `export_clips(pre_roll=, post_roll=)` | `4.0` / `2.0` | Seconds cut before and after the event timestamp. When a basket happens within the first `pre_roll` seconds the start clamps to 0 and the clip is correspondingly shorter, while still keeping `post_roll` seconds after the event |
+| `export_clips(timeout=)` | `120.0` | Wall-clock budget in seconds for a single ffmpeg call. A timeout counts as a failure: the clip is skipped, the half-written file is deleted, and the next clip is cut. Raise it for very large pre/post rolls or slow storage |
+| `BasketDetector(expected_sha256=)` | `None` | Optional. When a sha256 of the weights file is given it is verified before loading; a mismatch raises `ValueError`. Only `None` means "skip verification" — an empty or whitespace-only string also raises `ValueError` (it usually means a config lookup came back empty, and silently proceeding is more dangerous than erroring). The default behavior is unchanged |
 
-<!-- AUTO-GENERATED: 由源码导出符号生成，勿手改 -->
-## 模块参考
+<!-- AUTO-GENERATED: generated from the modules' exported symbols — do not edit by hand -->
+## Module reference
 
 ### `ingest/frame_extractor.py`
 
-| 符号 | 签名 | 说明 |
-|------|------|------|
-| `extract_frames` | `(video_path: str, sample_every_n: int = 1) -> Iterator[Tuple[int, float, np.ndarray]]` | 返回迭代器，逐帧产出 `(frame_index, timestamp_seconds, frame)`。**校验在调用时就执行**（函数本身不是生成器，内部另有一个生成器承载迭代），所以下列异常由调用本身抛出、不会延迟到第一次迭代：文件不存在抛 `FileNotFoundError`；无法解码、或容器报告的 fps ≤ 0（时间戳无从计算）抛 `RuntimeError`；`sample_every_n < 1` 抛 `ValueError` |
-| `get_video_info` | `(video_path: str) -> dict` | 返回 `fps` / `frame_count` / `width` / `height` / `duration_seconds` |
+| Symbol | Signature | Notes |
+|--------|-----------|-------|
+| `extract_frames` | `(video_path: str, sample_every_n: int = 1) -> Iterator[Tuple[int, float, np.ndarray]]` | Returns an iterator yielding `(frame_index, timestamp_seconds, frame)` per frame. **Validation runs at call time** (the function itself is not a generator; a separate inner generator carries the iteration), so the exceptions below are raised by the call itself and not deferred to the first iteration: `FileNotFoundError` if the file does not exist; `RuntimeError` if it cannot be decoded or the container reports fps ≤ 0 (timestamps would be uncomputable); `ValueError` if `sample_every_n < 1` |
+| `get_video_info` | `(video_path: str) -> dict` | Returns `fps` / `frame_count` / `width` / `height` / `duration_seconds` |
 
 ### `detect/basket_detector.py`
 
-| 符号 | 签名 | 说明 |
-|------|------|------|
-| `ModelClass` | `IntEnum(BALL=0, HOOP=1)` | 自训练模型的类别索引，顺序对应 `data.yaml` 的 `names` |
-| `BALL_CLASS` | `= ModelClass.BALL` | `basketball` 的类别 ID（`IntEnum` 成员，与 `int` 可直接比较） |
-| `HOOP_CLASS` | `= ModelClass.HOOP` | `hoop` 的类别 ID |
-| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35, expected_sha256: Optional[str] = None)` | 加载 YOLO 权重。`expected_sha256` 非 `None` 时先校验文件再加载，不匹配或传空串抛 `ValueError` |
-| `BasketDetector.detect` | `(frame: np.ndarray) -> dict` | 返回 `{"ball": det \| None, "hoop": det \| None, "frame_shape": (h, w)}`；`det` 为 `{"box": [x1,y1,x2,y2], "confidence": float, "center": (cx, cy)}` |
+| Symbol | Signature | Notes |
+|--------|-----------|-------|
+| `ModelClass` | `IntEnum(BALL=0, HOOP=1)` | Class indices of the custom-trained model, in the order of `names` in `data.yaml` |
+| `BALL_CLASS` | `= ModelClass.BALL` | Class ID of `basketball` (an `IntEnum` member, directly comparable with `int`) |
+| `HOOP_CLASS` | `= ModelClass.HOOP` | Class ID of `hoop` |
+| `BasketDetector.__init__` | `(model_path: str = "data/models/basketball.pt", confidence: float = 0.35, expected_sha256: Optional[str] = None)` | Loads the YOLO weights. When `expected_sha256` is not `None` the file is verified before loading; a mismatch or a blank string raises `ValueError` |
+| `BasketDetector.detect` | `(frame: np.ndarray) -> dict` | Returns `{"ball": det \| None, "hoop": det \| None, "frame_shape": (h, w)}`, where `det` is `{"box": [x1,y1,x2,y2], "confidence": float, "center": (cx, cy)}` |
 
 ### `events/scoring_event.py`
 
-| 符号 | 签名 | 说明 |
-|------|------|------|
-| `Point` | `= Tuple[int, int]` | 像素坐标 `(cx, cy)`，与 `BasketDetector.detect` 产出的 `center` 一致 |
-| `HistoryEntry` | `= Tuple[int, float, Optional[Point], float]` | 滚动历史的一项：`(frame_index, timestamp_seconds, ball_center, confidence)`；未检出球的帧 `ball_center` 为 `None` |
-| `ScoringEvent` | `dataclass(frame_index, timestamp_seconds, confidence, ball_center)` | 单次进球事件 |
-| `ScoringEventDetector.__init__` | `(cooldown_seconds: float = 3.0, min_downward_frames: int = 3)` | 维护 30 帧滚动历史 |
-| `ScoringEventDetector.update` | `(frame_index: int, timestamp: float, detection: dict) -> ScoringEvent \| None` | 喂入一帧检测结果；命中时返回事件并追加到 `.events` |
-| `ScoringEventDetector.events` | `List[ScoringEvent]` | 累计的全部进球事件 |
+| Symbol | Signature | Notes |
+|--------|-----------|-------|
+| `Point` | `= Tuple[int, int]` | Pixel coordinates `(cx, cy)`, matching the `center` produced by `BasketDetector.detect` |
+| `HistoryEntry` | `= Tuple[int, float, Optional[Point], float]` | One entry of the rolling history: `(frame_index, timestamp_seconds, ball_center, confidence)`; `ball_center` is `None` on frames where no ball was detected |
+| `ScoringEvent` | `dataclass(frame_index, timestamp_seconds, confidence, ball_center)` | A single scoring event |
+| `ScoringEventDetector.__init__` | `(cooldown_seconds: float = 3.0, min_downward_frames: int = 3)` | Maintains a 30-frame rolling history |
+| `ScoringEventDetector.update` | `(frame_index: int, timestamp: float, detection: dict) -> ScoringEvent \| None` | Feed in one frame's detection; on a hit it returns the event and appends it to `.events` |
+| `ScoringEventDetector.events` | `List[ScoringEvent]` | All scoring events accumulated so far |
 
 ### `clips/clip_exporter.py`
 
-| 符号 | 签名 | 说明 |
-|------|------|------|
-| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0, timeout: float = 120.0) -> List[str]` | 每个事件剪一个 `libx264 / crf 23 / aac` 的 mp4。单个片段失败（非零退出或超过 `timeout`）只打印警告、删除**本次写出的**半成品并跳过，不中断整批（ffmpeg 若在打开输出前就失败，上一次成功导出的同名片段不会被误删） —— **返回列表因此可能短于 `events`**，失败的事件时间戳会在结尾汇总打印 |
+| Symbol | Signature | Notes |
+|--------|-----------|-------|
+| `export_clips` | `(video_path: str, events: List[ScoringEvent], output_dir: str, pre_roll: float = 4.0, post_roll: float = 2.0, timeout: float = 120.0) -> List[str]` | Cuts one `libx264 / crf 23 / aac` mp4 per event. A single failed clip (non-zero exit or exceeding `timeout`) only prints a warning, deletes **the partial file this invocation wrote** and skips ahead without aborting the batch (if ffmpeg fails before it ever opens the output, a previously exported clip of the same name is not deleted by mistake) — **so the returned list may be shorter than `events`**, and the timestamps of the failed events are summarized in a final printed line |
 
-输出文件名格式：`{视频名}_basket_{序号:03d}_t{时间戳:.1f}s.mp4`
+Output filename format: `{video_name}_basket_{index:03d}_t{timestamp:.1f}s.mp4`
 <!-- END AUTO-GENERATED -->
 
-## 文档
+## Documentation
 
-| 文件 | 内容 |
-|------|------|
-| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | 开发环境、代码风格、测试、PR 清单 |
-| [docs/RUNBOOK.md](docs/RUNBOOK.md) | 模型训练与重训、常见故障排查、数据集配置 |
+| File | Contents |
+|------|----------|
+| [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Development environment, code style, testing, PR checklist |
+| [docs/RUNBOOK.md](docs/RUNBOOK.md) | Model training and retraining, troubleshooting, dataset configuration |
 
-## 数据集
+## Datasets
 
-训练数据来自 Roboflow，两个版本都在 `data/` 下（图片与标签被 `.gitignore` 排除，仅保留 YAML 与 Roboflow 元数据）：
+The training data comes from Roboflow. Both versions live under `data/` (images and labels are excluded
+by `.gitignore`; only the YAML files and the Roboflow metadata are kept):
 
-| 数据集 | 类别名 | 来源 |
-|--------|--------|------|
-| `data/basketball_dataset/` | `['basketball', 'hoop']` | `hoopai.yaml` 为实际训练所用配置 |
-| `data/hoopal_dataset/` | `['Basketball', 'Hoop']` | [Roboflow Universe · yimings-workspace-vykdp/hoopai](https://universe.roboflow.com/yimings-workspace-vykdp/hoopai/dataset/dataset)（CC BY 4.0） |
+| Dataset | Class names | Source |
+|---------|-------------|--------|
+| `data/basketball_dataset/` | `['basketball', 'hoop']` | [Roboflow Universe · basketball-qus2n/basketball-detection](https://universe.roboflow.com/basketball-qus2n/basketball-detection/dataset/1) (CC BY 4.0); `hoopai.yaml` is the config actually used for training |
+| `data/hoopal_dataset/` | `['Basketball', 'Hoop']` | [Roboflow Universe · yimings-workspace-vykdp/hoopai](https://universe.roboflow.com/yimings-workspace-vykdp/hoopai/dataset/dataset) (CC BY 4.0) |
 
-两个数据集类别顺序一致，因此 `BALL_CLASS=0` / `HOOP_CLASS=1` 对二者都成立。
+The class order is the same in both datasets, so `BALL_CLASS=0` / `HOOP_CLASS=1` holds for either.
