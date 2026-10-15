@@ -1,6 +1,11 @@
-train: ../train/images
-val: ../valid/images
-test: ../test/images
+# Simplified from the Roboflow export default (`../train/images`). That form was
+# NOT broken: ultralytics retries without the `../` prefix when the first attempt
+# does not exist, so it already landed here. Dropping it just removes a hop.
+# Paths are relative to the dataset root — see hoopai.yaml for how that root is
+# derived and why `data=` must be passed as an absolute path.
+train: train/images
+val: valid/images
+test: test/images
 
 nc: 2
 names: ['basketball', 'hoop']

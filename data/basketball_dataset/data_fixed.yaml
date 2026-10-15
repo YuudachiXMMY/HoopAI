@@ -1,3 +1,5 @@
+# Paths relative to the dataset root; pass `data=` as an absolute path.
+# See hoopai.yaml for the full rule and why no `path:` key is set.
 names:
 - basketball
 - hoop
@@ -8,6 +10,6 @@ roboflow:
   url: https://universe.roboflow.com/basketball-qus2n/basketball-detection/dataset/1
   version: 1
   workspace: basketball-qus2n
-test: /Users/user/HoopAI (Execute Plan)/data/test/images
-train: /Users/user/HoopAI (Execute Plan)/data/train/images
-val: /Users/user/HoopAI (Execute Plan)/data/valid/images
+test: test/images
+train: train/images
+val: valid/images

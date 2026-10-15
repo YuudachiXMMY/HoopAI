@@ -6,7 +6,13 @@ Works on any camera angle since it uses the actual hoop location.
 
 from collections import deque
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Deque, List, Optional, Tuple
+
+# (cx, cy) in pixels, as produced by BasketDetector.detect
+Point = Tuple[int, int]
+# One _history entry: (frame_index, timestamp_seconds, ball_center, confidence).
+# ball_center is None on frames where no ball was detected.
+HistoryEntry = Tuple[int, float, Optional[Point], float]
 
 
 @dataclass
@@ -14,10 +20,10 @@ class ScoringEvent:
     frame_index: int
     timestamp_seconds: float
     confidence: float
-    ball_center: tuple
+    ball_center: Point
 
 
-def _box_overlap(ball_center, hoop_box, margin: float = 1.4) -> bool:
+def _box_overlap(ball_center: Point, hoop_box: List[int], margin: float = 1.4) -> bool:
     """Check if ball center is inside hoop box (with margin for near-misses)."""
     cx, cy = ball_center
     x1, y1, x2, y2 = hoop_box
@@ -36,7 +42,7 @@ class ScoringEventDetector:
     ):
         self.cooldown_seconds = cooldown_seconds
         self.min_downward_frames = min_downward_frames
-        self._history: deque = deque(maxlen=30)
+        self._history: Deque[HistoryEntry] = deque(maxlen=30)
         self._last_event_ts: float = -999.0
         self.events: List[ScoringEvent] = []
 
