@@ -109,3 +109,4 @@ data/**
 .codex/skills/.system/**
 !.codex/prompts/
 !.codex/prompts/**
+.claude/worktrees/
