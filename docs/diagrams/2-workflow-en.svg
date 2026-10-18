@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .t-title { font-size: 44px; font-weight: 700; fill: #1F2430; }
+      .t-sub   { font-size: 19px; fill: #6B7280; }
+      .grp     { font-size: 17px; font-weight: 700; }
+      .num     { font-size: 18px; font-weight: 700; fill: #FFFFFF; }
+      .box-t   { font-size: 18.5px; font-weight: 700; fill: #1F2430; }
+      .box-d   { font-size: 14px; fill: #4B5563; }
+      .chip-t  { font-size: 12.5px; }
+      .p-title { font-size: 21px; font-weight: 700; fill: #1F2430; }
+      .c-title { font-size: 16.5px; font-weight: 700; fill: #1F2430; }
+      .c-sub   { font-size: 13.5px; fill: #5B6472; }
+      .concl   { font-size: 16px; fill: #1F2430; }
+      .warn    { font-size: 15px; fill: #8A6D3B; }
+      .step    { font-size: 15px; fill: #3F3A52; }
+      .note    { font-size: 16px; fill: #4B5563; }
+      .cap     { font-size: 14px; fill: #9CA3AF; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFDF8"/>
+
+  <text class="t-title" x="60" y="68">How does HoopAI work?</text>
+  <text class="t-sub" x="60" y="102">From one recording to a pile of highlight clips, the computer does 5 things</text>
+
+  <!-- ===== group backgrounds ===== -->
+  <rect x="48" y="168" width="586" height="268" rx="18" fill="#F2F7FF"/>
+  <rect x="660" y="168" width="586" height="268" rx="18" fill="#F8F4FF"/>
+  <rect x="1272" y="168" width="280" height="268" rx="18" fill="#FFF6F0"/>
+
+  <text class="grp" x="62" y="160" fill="#1B4FBF">👀 Eyes — take the video in</text>
+  <text class="grp" x="674" y="160" fill="#5B2FB8">🧠 Brain — recognize, then judge</text>
+  <text class="grp" x="1286" y="160" fill="#C2520C">✋ Hands — cut</text>
+
+  <!-- ===== STEP 1 ===== -->
+  <rect x="60" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <circle cx="100" cy="212" r="18" fill="#2F6FED"/>
+  <text class="num" x="100" y="219" text-anchor="middle">1</text>
+  <text x="132" y="222" font-size="26">📹</text>
+  <text class="box-t" x="78" y="262">Get a video</text>
+  <text class="box-d" x="78" y="300">Any basketball clip shot</text>
+  <text class="box-d" x="78" y="324">on a phone will do.</text>
+  <text class="box-d" x="78" y="348">.MOV / .mp4 both work.</text>
+  <rect x="78" y="390" width="58" height="24" rx="7" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="88" y="407" fill="#1B4FBF">input</text>
+
+  <path d="M322 302 H348" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M347 294 L360 302 L347 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 2 ===== -->
+  <rect x="366" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <circle cx="406" cy="212" r="18" fill="#2F6FED"/>
+  <text class="num" x="406" y="219" text-anchor="middle">2</text>
+  <text x="438" y="222" font-size="26">🖼</text>
+  <text class="box-t" x="384" y="262">Split into photos</text>
+  <text class="box-d" x="384" y="300">Each photo remembers</text>
+  <text class="box-d" x="384" y="324">which second it is.</text>
+  <text class="box-d" x="384" y="348">You can look at only</text>
+  <text class="box-d" x="384" y="372">every Nth: fewer = faster.</text>
+  <rect x="384" y="390" width="78" height="24" rx="7" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="394" y="407" fill="#1B4FBF">ingest/</text>
+
+  <path d="M628 302 H654" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M653 294 L666 302 L653 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 3 ===== -->
+  <rect x="672" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <circle cx="712" cy="212" r="18" fill="#7C4DDB"/>
+  <text class="num" x="712" y="219" text-anchor="middle">3</text>
+  <text x="744" y="222" font-size="26">🔍</text>
+  <text class="box-t" x="690" y="262">Find ball and hoop</text>
+  <text class="box-d" x="690" y="300">The AI circles the ball</text>
+  <text class="box-d" x="690" y="324">and the hoop on every</text>
+  <text class="box-d" x="690" y="348">photo. Only the most</text>
+  <text class="box-d" x="690" y="372">confident one of each.</text>
+  <rect x="690" y="390" width="78" height="24" rx="7" fill="#F1EBFE"/>
+  <text class="chip-t mono" x="700" y="407" fill="#5B2FB8">detect/</text>
+
+  <path d="M934 302 H960" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M959 294 L972 302 L959 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 4 ===== -->
+  <rect x="978" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <circle cx="1018" cy="212" r="18" fill="#7C4DDB"/>
+  <text class="num" x="1018" y="219" text-anchor="middle">4</text>
+  <text x="1050" y="222" font-size="26">🧮</text>
+  <text class="box-t" x="996" y="262">Is that a basket?</text>
+  <text class="box-d" x="996" y="300">Three conditions must</text>
+  <text class="box-d" x="996" y="324">all hold — see the</text>
+  <text class="box-d" x="996" y="348">magnifier below.</text>
+  <text class="box-d" x="996" y="372">Records frame and time.</text>
+  <rect x="996" y="390" width="78" height="24" rx="7" fill="#F1EBFE"/>
+  <text class="chip-t mono" x="1006" y="407" fill="#5B2FB8">events/</text>
+
+  <path d="M1240 302 H1266" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M1265 294 L1278 302 L1265 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 5 ===== -->
+  <rect x="1284" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#FBD8BD" stroke-width="1.5"/>
+  <circle cx="1324" cy="212" r="18" fill="#F4731C"/>
+  <text class="num" x="1324" y="219" text-anchor="middle">5</text>
+  <text x="1356" y="222" font-size="26">✂️</text>
+  <text class="box-t" x="1302" y="262">Cut the highlights</text>
+  <text class="box-d" x="1302" y="300">One clip per basket:</text>
+  <text class="box-d" x="1302" y="324">4 s before + 2 s after.</text>
+  <text class="box-d" x="1302" y="348">If one fails it is just</text>
+  <text class="box-d" x="1302" y="372">skipped, the rest go on.</text>
+  <rect x="1302" y="390" width="78" height="24" rx="7" fill="#FEEEE2"/>
+  <text class="chip-t mono" x="1312" y="407" fill="#C2520C">clips/</text>
+
+  <!-- ===== PANEL A : the scoring rule ===== -->
+  <rect x="60" y="478" width="960" height="250" rx="16" fill="#FFFFFF" stroke="#E8E3DA" stroke-width="1.5"/>
+  <text class="p-title" x="84" y="516">🔎 A closer look at step 4: how do we know it went in?</text>
+
+  <rect x="84" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="104" y="568" font-size="22">🎯</text>
+  <text class="c-title" x="136" y="568">Ball centre in the hoop</text>
+  <text class="c-sub" x="104" y="600">The hoop box is enlarged 1.4×</text>
+  <text class="c-sub" x="104" y="624">first — a little forgiving</text>
+
+  <rect x="396" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="416" y="568" font-size="22">⬇️</text>
+  <text class="c-title" x="448" y="568">The ball is falling</text>
+  <text class="c-sub" x="416" y="600">In the last 4 photos it moved</text>
+  <text class="c-sub" x="416" y="624">downward 3 times</text>
+
+  <rect x="708" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="728" y="568" font-size="22">⏱</text>
+  <text class="c-title" x="760" y="568">3 s since the last one</text>
+  <text class="c-sub" x="728" y="600">So one basket never gets</text>
+  <text class="c-sub" x="728" y="624">counted several times</text>
+
+  <text class="concl" x="84" y="684">All three hold → ✅ count a basket　|　any one fails → do nothing, move on to the next photo</text>
+  <text class="warn" x="84" y="712">⚠️ The ball and the hoop must be in the same photo — while the hoop is hidden behind someone, baskets go unnoticed.</text>
+
+  <!-- ===== PANEL B : training ===== -->
+  <rect x="1050" y="478" width="490" height="250" rx="16" fill="#FBFAFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="p-title" x="1074" y="516">🎓 How did the AI learn?</text>
+
+  <line x1="1086" y1="544" x2="1086" y2="652" stroke="#DFD2FA" stroke-width="2" stroke-dasharray="4 5"/>
+  <circle cx="1086" cy="546" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="551">1389 basketball photos</text>
+  <circle cx="1086" cy="582" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="587">Humans circled ball and hoop on each</text>
+  <circle cx="1086" cy="618" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="623">YOLOv8 looked and practised, over and over</text>
+  <circle cx="1086" cy="652" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="657">Out came basketball.pt — its memory</text>
+
+  <text class="warn" x="1074" y="702">📌 Planned 20 rounds, only 2 done — still a beginner.</text>
+
+  <!-- ===== FOOTER NOTES ===== -->
+  <line x1="60" y1="756" x2="1540" y2="756" stroke="#EDE7DC" stroke-width="1.5"/>
+  <text class="note" x="60" y="794">📌 There is no one-click button yet — those 5 steps have to be wired together in a few lines of Python (the README has code to copy).</text>
+  <text class="note" x="60" y="828">📌 Why does a different camera angle still work? Because step 3 really finds where the hoop is in the photo, instead of hard-coding its position.</text>
+  <text class="cap" x="60" y="872">HoopAI · basketball scoring detection and highlight clipping pipeline</text>
+</svg>
