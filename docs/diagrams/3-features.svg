@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .t-title { font-size: 44px; font-weight: 700; fill: #1F2430; }
+      .t-sub   { font-size: 19px; fill: #6B7280; }
+      .pill    { font-size: 19px; font-weight: 700; }
+      .count   { font-size: 15px; fill: #9CA3AF; }
+      .f-title { font-size: 17.5px; font-weight: 700; fill: #1F2430; }
+      .f-desc  { font-size: 14.5px; fill: #4B5563; }
+      .f-mod   { font-size: 12px; fill: #9CA3AF; }
+      .g-title { font-size: 16px; font-weight: 700; fill: #1F2430; }
+      .g-desc  { font-size: 13.5px; fill: #6B6250; }
+      .foot    { font-size: 16px; fill: #6B7280; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFDF8"/>
+
+  <text class="t-title" x="60" y="68">HoopAI 现在会做什么？还不会做什么？</text>
+  <text class="t-sub" x="60" y="102">左边是已经写好、现在就能跑起来的；右边是还缺的部分 —— 把它们做出来，就是接下来的任务</text>
+
+  <!-- ================= LEFT : DONE ================= -->
+  <rect x="60" y="140" width="900" height="690" rx="18" fill="#FFFFFF" stroke="#D9EAE0" stroke-width="1.5"/>
+  <rect x="84" y="160" width="250" height="40" rx="12" fill="#E7F6EE"/>
+  <text class="pill" x="102" y="187" fill="#157347">✅ 现在已经能做到</text>
+  <text class="count" x="936" y="187" text-anchor="end">8 项</text>
+  <line x1="84" y1="216" x2="936" y2="216" stroke="#EEF3F0" stroke-width="1.5"/>
+
+  <!-- row 1 -->
+  <rect x="84" y="232" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="272" font-size="24">🖼</text>
+  <text class="f-title" x="142" y="272">把视频拆开，还记住时间</text>
+  <text class="f-desc" x="104" y="302">每张照片都知道自己是第几秒，</text>
+  <text class="f-desc" x="104" y="324">后面剪片子才能剪得准。</text>
+  <text class="f-mod mono" x="104" y="348">ingest/frame_extractor.py</text>
+
+  <rect x="520" y="232" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="272" font-size="24">🏀</text>
+  <text class="f-title" x="578" y="272">同时认出篮球和篮框</text>
+  <text class="f-desc" x="540" y="302">自己训练出来的 AI，专门只认</text>
+  <text class="f-desc" x="540" y="324">这两样东西，所以又快又专注。</text>
+  <text class="f-mod mono" x="540" y="348">detect/basket_detector.py</text>
+
+  <!-- row 2 -->
+  <rect x="84" y="380" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="420" font-size="24">📐</text>
+  <text class="f-title" x="142" y="420">不挑拍摄角度</text>
+  <text class="f-desc" x="104" y="450">用真实检测到的篮框位置来判断，</text>
+  <text class="f-desc" x="104" y="472">所以换个位置、换个角度拍都行。</text>
+  <text class="f-mod mono" x="104" y="496">detect/ + events/</text>
+
+  <rect x="520" y="380" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="420" font-size="24">⬇️</text>
+  <text class="f-title" x="578" y="420">分得出「进了」和「没进」</text>
+  <text class="f-desc" x="540" y="450">要求球正在往下掉才算，</text>
+  <text class="f-desc" x="540" y="472">所以往上飞、被拦下来的都不算。</text>
+  <text class="f-mod mono" x="540" y="496">events/scoring_event.py</text>
+
+  <!-- row 3 -->
+  <rect x="84" y="528" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="568" font-size="24">⏱</text>
+  <text class="f-title" x="142" y="568">同一个进球不重复数</text>
+  <text class="f-desc" x="104" y="598">3 秒冷却时间，一个连续动作</text>
+  <text class="f-desc" x="104" y="620">不会被数成好几次进球。</text>
+  <text class="f-mod mono" x="104" y="644">events/scoring_event.py</text>
+
+  <rect x="520" y="528" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="568" font-size="24">✂️</text>
+  <text class="f-title" x="578" y="568">自动剪出高光片段</text>
+  <text class="f-desc" x="540" y="598">每个进球剪一段：前 4 秒 + 后 2 秒，</text>
+  <text class="f-desc" x="540" y="620">文件名自带进球时间，方便对照。</text>
+  <text class="f-mod mono" x="540" y="644">clips/clip_exporter.py</text>
+
+  <!-- row 4 -->
+  <rect x="84" y="676" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="716" font-size="24">🛟</text>
+  <text class="f-title" x="142" y="716">一段剪坏，不影响其他段</text>
+  <text class="f-desc" x="104" y="746">失败或卡住超过 120 秒就跳过，</text>
+  <text class="f-desc" x="104" y="768">最后会告诉你丢掉了哪几段。</text>
+  <text class="f-mod mono" x="104" y="792">clips/clip_exporter.py</text>
+
+  <rect x="520" y="676" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="716" font-size="24">🔐</text>
+  <text class="f-title" x="578" y="716">能检查 AI 文件有没有被换过</text>
+  <text class="f-desc" x="540" y="746">填上一串校验码（sha256），</text>
+  <text class="f-desc" x="540" y="768">对不上就直接拒绝加载。</text>
+  <text class="f-mod mono" x="540" y="792">detect/basket_detector.py</text>
+
+  <!-- ================= RIGHT : NOT YET ================= -->
+  <rect x="990" y="140" width="550" height="690" rx="18" fill="#FFFDF7" stroke="#F0DEBC" stroke-width="1.5"/>
+  <rect x="1014" y="160" width="268" height="40" rx="12" fill="#FDF4E3"/>
+  <text class="pill" x="1032" y="187" fill="#B4740A">🚧 还做不到 / 计划中</text>
+  <text class="count" x="1516" y="187" text-anchor="end">7 项</text>
+  <line x1="1014" y1="216" x2="1516" y2="216" stroke="#F5EBD8" stroke-width="1.5"/>
+
+  <rect x="1014" y="232" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="264" font-size="19">🚫</text>
+  <text class="g-title" x="1062" y="264">没有「一键运行」的按钮</text>
+  <text class="g-desc" x="1030" y="290">要自己写几行代码，把那 5 步串起来</text>
+
+  <rect x="1014" y="316" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="348" font-size="19">🎓</text>
+  <text class="g-title" x="1062" y="348">AI 还是个新手</text>
+  <text class="g-desc" x="1030" y="374">原计划练 20 轮，只练了 2 轮，有些进球会漏掉</text>
+
+  <rect x="1014" y="400" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="432" font-size="19">🐢</text>
+  <text class="g-title" x="1062" y="432">跑得比较慢</text>
+  <text class="g-desc" x="1030" y="458">目前只用 CPU，长视频可能要跑几十分钟</text>
+
+  <rect x="1014" y="484" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="516" font-size="19">🧪</text>
+  <text class="g-title" x="1062" y="516">一个测试都没有</text>
+  <text class="g-desc" x="1030" y="542">改判定规则的时候，没有安全网兜着</text>
+
+  <rect x="1014" y="568" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="600" font-size="19">🙈</text>
+  <text class="g-title" x="1062" y="600">没有进度条</text>
+  <text class="g-desc" x="1030" y="626">跑起来看不到进展，只能干等（tqdm 装了没接上）</text>
+
+  <rect x="1014" y="652" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="684" font-size="19">🙋</text>
+  <text class="g-title" x="1062" y="684">不认球员，也不记比分</text>
+  <text class="g-desc" x="1030" y="710">不知道是谁投进的，也不分哪支队伍</text>
+
+  <rect x="1014" y="736" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="768" font-size="19">⚙️</text>
+  <text class="g-title" x="1062" y="768">宽容度不能随手调</text>
+  <text class="g-desc" x="1030" y="794">1.4 倍是写死在代码里的，想调得改源码</text>
+
+  <text class="foot" x="60" y="872">✅ = 代码里真的有、现在就能跑　｜　🚧 = 还没有，是接下来要做的　｜　这个项目目前是一套「积木」，还不是一个做好的 App。</text>
+</svg>

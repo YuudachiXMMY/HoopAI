@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .t-title { font-size: 44px; font-weight: 700; fill: #1F2430; }
+      .t-sub   { font-size: 19px; fill: #6B7280; }
+      .grp     { font-size: 17px; font-weight: 700; }
+      .num     { font-size: 18px; font-weight: 700; fill: #FFFFFF; }
+      .box-t   { font-size: 18.5px; font-weight: 700; fill: #1F2430; }
+      .box-d   { font-size: 14px; fill: #4B5563; }
+      .chip-t  { font-size: 12.5px; }
+      .p-title { font-size: 21px; font-weight: 700; fill: #1F2430; }
+      .c-title { font-size: 16.5px; font-weight: 700; fill: #1F2430; }
+      .c-sub   { font-size: 13.5px; fill: #5B6472; }
+      .concl   { font-size: 16px; fill: #1F2430; }
+      .warn    { font-size: 15px; fill: #8A6D3B; }
+      .step    { font-size: 15px; fill: #3F3A52; }
+      .note    { font-size: 16px; fill: #4B5563; }
+      .cap     { font-size: 14px; fill: #9CA3AF; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFDF8"/>
+
+  <text class="t-title" x="60" y="68">HoopAI 是怎么工作的？</text>
+  <text class="t-sub" x="60" y="102">从「一段录像」到「一堆高光片段」，电脑一共做了 5 件事</text>
+
+  <!-- ===== group backgrounds ===== -->
+  <rect x="48" y="168" width="586" height="268" rx="18" fill="#F2F7FF"/>
+  <rect x="660" y="168" width="586" height="268" rx="18" fill="#F8F4FF"/>
+  <rect x="1272" y="168" width="280" height="268" rx="18" fill="#FFF6F0"/>
+
+  <text class="grp" x="62" y="160" fill="#1B4FBF">👀 眼睛 —— 把视频看进来</text>
+  <text class="grp" x="674" y="160" fill="#5B2FB8">🧠 大脑 —— 认出来，再做判断</text>
+  <text class="grp" x="1286" y="160" fill="#C2520C">✋ 手 —— 剪出来</text>
+
+  <!-- ===== STEP 1 ===== -->
+  <rect x="60" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <circle cx="100" cy="212" r="18" fill="#2F6FED"/>
+  <text class="num" x="100" y="219" text-anchor="middle">1</text>
+  <text x="132" y="222" font-size="26">📹</text>
+  <text class="box-t" x="78" y="262">拿到一段视频</text>
+  <text class="box-d" x="78" y="300">手机横着拍的篮球</text>
+  <text class="box-d" x="78" y="324">录像就可以，</text>
+  <text class="box-d" x="78" y="348">.MOV / .mp4 都能读。</text>
+  <rect x="78" y="390" width="58" height="24" rx="7" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="88" y="407" fill="#1B4FBF">输入</text>
+
+  <path d="M322 302 H348" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M347 294 L360 302 L347 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 2 ===== -->
+  <rect x="366" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <circle cx="406" cy="212" r="18" fill="#2F6FED"/>
+  <text class="num" x="406" y="219" text-anchor="middle">2</text>
+  <text x="438" y="222" font-size="26">🖼</text>
+  <text class="box-t" x="384" y="262">拆成一张张照片</text>
+  <text class="box-d" x="384" y="300">每一张都记住自己</text>
+  <text class="box-d" x="384" y="324">是第几秒。</text>
+  <text class="box-d" x="384" y="348">可以每隔几帧才看</text>
+  <text class="box-d" x="384" y="372">一张：看得少，跑得快</text>
+  <rect x="384" y="390" width="78" height="24" rx="7" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="394" y="407" fill="#1B4FBF">ingest/</text>
+
+  <path d="M628 302 H654" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M653 294 L666 302 L653 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 3 ===== -->
+  <rect x="672" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <circle cx="712" cy="212" r="18" fill="#7C4DDB"/>
+  <text class="num" x="712" y="219" text-anchor="middle">3</text>
+  <text x="744" y="222" font-size="26">🔍</text>
+  <text class="box-t" x="690" y="262">找出球和篮框</text>
+  <text class="box-d" x="690" y="300">AI 在每张照片上圈</text>
+  <text class="box-d" x="690" y="324">出篮球和篮框。</text>
+  <text class="box-d" x="690" y="348">只留最有把握的那</text>
+  <text class="box-d" x="690" y="372">一个球、一个框。</text>
+  <rect x="690" y="390" width="78" height="24" rx="7" fill="#F1EBFE"/>
+  <text class="chip-t mono" x="700" y="407" fill="#5B2FB8">detect/</text>
+
+  <path d="M934 302 H960" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M959 294 L972 302 L959 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 4 ===== -->
+  <rect x="978" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <circle cx="1018" cy="212" r="18" fill="#7C4DDB"/>
+  <text class="num" x="1018" y="219" text-anchor="middle">4</text>
+  <text x="1050" y="222" font-size="26">🧮</text>
+  <text class="box-t" x="996" y="262">判断「进了吗？」</text>
+  <text class="box-d" x="996" y="300">三个条件同时满足</text>
+  <text class="box-d" x="996" y="324">才算一次进球</text>
+  <text class="box-d" x="996" y="348">（见下面的放大镜）。</text>
+  <text class="box-d" x="996" y="372">记下第几帧、第几秒。</text>
+  <rect x="996" y="390" width="78" height="24" rx="7" fill="#F1EBFE"/>
+  <text class="chip-t mono" x="1006" y="407" fill="#5B2FB8">events/</text>
+
+  <path d="M1240 302 H1266" stroke="#A9B2BF" stroke-width="3" fill="none"/>
+  <path d="M1265 294 L1278 302 L1265 310 Z" fill="#A9B2BF"/>
+
+  <!-- ===== STEP 5 ===== -->
+  <rect x="1284" y="176" width="256" height="252" rx="14" fill="#FFFFFF" stroke="#FBD8BD" stroke-width="1.5"/>
+  <circle cx="1324" cy="212" r="18" fill="#F4731C"/>
+  <text class="num" x="1324" y="219" text-anchor="middle">5</text>
+  <text x="1356" y="222" font-size="26">✂️</text>
+  <text class="box-t" x="1302" y="262">剪出高光片段</text>
+  <text class="box-d" x="1302" y="300">每个进球剪一段：</text>
+  <text class="box-d" x="1302" y="324">前 4 秒 + 后 2 秒。</text>
+  <text class="box-d" x="1302" y="348">某一段剪失败就跳</text>
+  <text class="box-d" x="1302" y="372">过，不影响其他段。</text>
+  <rect x="1302" y="390" width="78" height="24" rx="7" fill="#FEEEE2"/>
+  <text class="chip-t mono" x="1312" y="407" fill="#C2520C">clips/</text>
+
+  <!-- ===== PANEL A : the scoring rule ===== -->
+  <rect x="60" y="478" width="960" height="250" rx="16" fill="#FFFFFF" stroke="#E8E3DA" stroke-width="1.5"/>
+  <text class="p-title" x="84" y="516">🔎 放大看第 4 步：怎么判断「这球进了」？</text>
+
+  <rect x="84" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="104" y="568" font-size="22">🎯</text>
+  <text class="c-title" x="136" y="568">球心进了篮框</text>
+  <text class="c-sub" x="104" y="600">篮框会先放大 1.4 倍，</text>
+  <text class="c-sub" x="104" y="624">宽容一点，别太苛刻</text>
+
+  <rect x="396" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="416" y="568" font-size="22">⬇️</text>
+  <text class="c-title" x="448" y="568">球正在往下掉</text>
+  <text class="c-sub" x="416" y="600">最近 4 张照片里，</text>
+  <text class="c-sub" x="416" y="624">有 3 次位置在往下</text>
+
+  <rect x="708" y="534" width="296" height="118" rx="12" fill="#F7F9FC" stroke="#E3E8EF" stroke-width="1.5"/>
+  <text x="728" y="568" font-size="22">⏱</text>
+  <text class="c-title" x="760" y="568">离上次进球 3 秒</text>
+  <text class="c-sub" x="728" y="600">同一个进球不会被</text>
+  <text class="c-sub" x="728" y="624">重复数成好几次</text>
+
+  <text class="concl" x="84" y="684">三个都满足 → ✅ 记一次进球　｜　任何一个不满足 → 什么也不做，继续看下一张照片</text>
+  <text class="warn" x="84" y="712">⚠️ 球和篮框必须出现在同一张照片里 —— 篮框被人挡住的那段时间，再进球也发现不了。</text>
+
+  <!-- ===== PANEL B : training ===== -->
+  <rect x="1050" y="478" width="490" height="250" rx="16" fill="#FBFAFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="p-title" x="1074" y="516">🎓 AI 是怎么学会认球的？</text>
+
+  <line x1="1086" y1="544" x2="1086" y2="652" stroke="#DFD2FA" stroke-width="2" stroke-dasharray="4 5"/>
+  <circle cx="1086" cy="546" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="551">1389 张篮球照片</text>
+  <circle cx="1086" cy="582" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="587">人类把球和框一张张圈出来</text>
+  <circle cx="1086" cy="618" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="623">YOLOv8 反复看、反复练</text>
+  <circle cx="1086" cy="652" r="5" fill="#7C4DDB"/>
+  <text class="step" x="1106" y="657">得到 basketball.pt（它的记忆）</text>
+
+  <text class="warn" x="1074" y="702">📌 原计划练 20 轮，目前只练了 2 轮 —— 它还是个新手。</text>
+
+  <!-- ===== FOOTER NOTES ===== -->
+  <line x1="60" y1="756" x2="1540" y2="756" stroke="#EDE7DC" stroke-width="1.5"/>
+  <text class="note" x="60" y="794">📌 目前还没有「一键运行」的按钮 —— 上面这 5 步要用几行 Python 代码手动串起来（README 里有现成的可以照抄）。</text>
+  <text class="note" x="60" y="828">📌 为什么换个角度拍也能用？因为第 3 步是真的在照片里「找到篮框在哪」，而不是提前把篮框位置写死在代码里。</text>
+  <text class="cap" x="60" y="872">HoopAI · 篮球进球检测与高光剪辑流水线</text>
+</svg>

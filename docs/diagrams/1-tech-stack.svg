@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .t-title { font-size: 44px; font-weight: 700; fill: #1F2430; }
+      .t-sub   { font-size: 19px; fill: #6B7280; }
+      .col-h   { font-size: 24px; font-weight: 700; }
+      .card-n  { font-size: 22px; font-weight: 700; fill: #1F2430; }
+      .card-n2 { font-size: 19px; font-weight: 700; fill: #1F2430; }
+      .card-d  { font-size: 16px; fill: #4B5563; }
+      .card-s  { font-size: 15.5px; fill: #4B5563; }
+      .accent  { font-size: 15px; fill: #8A6D3B; }
+      .meta    { font-size: 12.5px; fill: #9CA3AF; }
+      .chip-t  { font-size: 13px; }
+      .fnd-h   { font-size: 20px; font-weight: 700; fill: #4A3F2A; }
+      .fnd-t   { font-size: 15.5px; fill: #5B5245; }
+      .foot    { font-size: 16px; fill: #6B7280; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFDF8"/>
+
+  <!-- decorative basketball -->
+  <g opacity="0.07">
+    <circle cx="1472" cy="46" r="74" fill="#F4731C"/>
+    <path d="M1398 46 H1546 M1472 -28 V120 M1420 -6 Q1472 46 1420 98 M1524 -6 Q1472 46 1524 98"
+          stroke="#FFFDF8" stroke-width="4" fill="none"/>
+  </g>
+
+  <text class="t-title" x="60" y="68">HoopAI 用到了哪些技术？</text>
+  <text class="t-sub" x="60" y="102">一个会自己从篮球录像里找出进球瞬间、并剪成高光片段的小程序</text>
+
+  <!-- ============ COLUMN 1 : EYES ============ -->
+  <rect x="60" y="132" width="473" height="52" rx="14" fill="#E8F0FE"/>
+  <text class="col-h" x="82" y="165" fill="#1B4FBF">👀 眼睛 —— 把视频「看」进来</text>
+
+  <rect x="60" y="204" width="473" height="238" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <text class="card-n" x="82" y="242">OpenCV</text>
+  <rect x="82" y="256" width="186" height="26" rx="8" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="92" y="274" fill="#1B4FBF">opencv-python ≥4.8</text>
+  <text class="card-d" x="82" y="310">把一整段视频，拆成一张一张</text>
+  <text class="card-d" x="82" y="336">静止的照片，</text>
+  <text class="card-d" x="82" y="362">并算出每张是视频的第几秒。</text>
+  <line x1="82" y1="386" x2="511" y2="386" stroke="#EEF2F7" stroke-width="1.5"/>
+  <text class="accent" x="82" y="414">💡 就像把动画片一页一页翻开来看</text>
+
+  <rect x="60" y="462" width="473" height="238" rx="14" fill="#FFFFFF" stroke="#CFE0FD" stroke-width="1.5"/>
+  <text class="card-n" x="82" y="500">NumPy</text>
+  <rect x="82" y="514" width="128" height="26" rx="8" fill="#E8F0FE"/>
+  <text class="chip-t mono" x="92" y="532" fill="#1B4FBF">numpy ≥1.24</text>
+  <text class="card-d" x="82" y="568">在电脑眼里，一张照片其实就是</text>
+  <text class="card-d" x="82" y="594">一大堆数字。NumPy 负责又快又</text>
+  <text class="card-d" x="82" y="620">省力地搬运这些数字。</text>
+  <line x1="82" y1="644" x2="511" y2="644" stroke="#EEF2F7" stroke-width="1.5"/>
+  <text class="accent" x="82" y="672">💡 照片 = 一张超级大的数字表格</text>
+
+  <!-- flow chevron 1 -->
+  <path d="M541 440 L556 452 L541 464 Z" fill="#D6CFC2"/>
+
+  <!-- ============ COLUMN 2 : BRAIN ============ -->
+  <rect x="563" y="132" width="473" height="52" rx="14" fill="#F1EBFE"/>
+  <text class="col-h" x="585" y="165" fill="#5B2FB8">🧠 大脑 —— 认出球和框，判断进没进</text>
+
+  <rect x="563" y="204" width="473" height="112" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="card-n2" x="585" y="236">YOLOv8 · Ultralytics</text>
+  <text class="meta mono" x="585" y="256">ultralytics ≥8.0</text>
+  <text class="card-s" x="585" y="282">一个专门「找东西」的 AI。我们只</text>
+  <text class="card-s" x="585" y="304">教它找两样：篮球 🏀 和篮框 ⭕</text>
+
+  <rect x="563" y="332" width="473" height="112" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="card-n2" x="585" y="364">basketball.pt</text>
+  <text class="meta mono" x="585" y="384">23 MB · 自己训练出来的</text>
+  <text class="card-s" x="585" y="410">AI 练完之后留下的「记忆存档」。</text>
+  <text class="card-s" x="585" y="432">换掉这个文件，它就会变聪明或变笨</text>
+
+  <rect x="563" y="460" width="473" height="112" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="card-n2" x="585" y="492">Roboflow 数据集</text>
+  <text class="meta mono" x="585" y="512">1389 张标注照片 · CC BY 4.0</text>
+  <text class="card-s" x="585" y="538">AI 的练习册：人类先在照片上把球</text>
+  <text class="card-s" x="585" y="560">和篮框圈出来，AI 再照着一张张学</text>
+
+  <rect x="563" y="588" width="473" height="112" rx="14" fill="#FFFFFF" stroke="#DFD2FA" stroke-width="1.5"/>
+  <text class="card-n2" x="585" y="620">我们自己写的判定规则</text>
+  <text class="meta mono" x="585" y="640">纯 Python · 没有用到 AI</text>
+  <text class="card-s" x="585" y="666">AI 只负责说「球和框在哪」，</text>
+  <text class="card-s" x="585" y="688">算不算进球是我们定的规矩（见第 2 张图）</text>
+
+  <!-- flow chevron 2 -->
+  <path d="M1044 440 L1059 452 L1044 464 Z" fill="#D6CFC2"/>
+
+  <!-- ============ COLUMN 3 : HANDS ============ -->
+  <rect x="1066" y="132" width="473" height="52" rx="14" fill="#FEEEE2"/>
+  <text class="col-h" x="1088" y="165" fill="#C2520C">✋ 手 —— 把精彩的那几秒剪下来</text>
+
+  <rect x="1066" y="204" width="473" height="322" rx="14" fill="#FFFFFF" stroke="#FBD8BD" stroke-width="1.5"/>
+  <text class="card-n" x="1088" y="242">FFmpeg</text>
+  <rect x="1088" y="256" width="152" height="26" rx="8" fill="#FEEEE2"/>
+  <text class="chip-t mono" x="1098" y="274" fill="#C2520C">命令行工具，不是库</text>
+  <text class="card-d" x="1088" y="310">视频世界的瑞士军刀 —— 几乎</text>
+  <text class="card-d" x="1088" y="336">什么视频都能剪、能转。</text>
+  <text class="card-n2" x="1088" y="382">我们只用它一招：</text>
+  <text class="card-d" x="1088" y="412">从进球前 4 秒，剪到进球后 2 秒。</text>
+  <line x1="1088" y1="444" x2="1517" y2="444" stroke="#EEF2F7" stroke-width="1.5"/>
+  <text class="accent" x="1088" y="472">💡 它不是 Python 库 —— 我们是像在</text>
+  <text class="accent" x="1088" y="496">终端里敲命令那样去使唤它的。</text>
+
+  <rect x="1066" y="546" width="473" height="154" rx="14" fill="#FEF6EF" stroke="#F8C9A4" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text class="card-n2" x="1088" y="582" fill="#C2520C">🎬 最后产出</text>
+  <text class="card-s" x="1088" y="616">一个个 6 秒的高光 mp4 小片段</text>
+  <text class="card-s" x="1088" y="644">画面用 libx264，声音用 aac</text>
+  <text class="card-s" x="1088" y="672">文件名自带进球时间，方便对照原片</text>
+
+  <!-- ============ FOUNDATION ============ -->
+  <rect x="60" y="724" width="1480" height="104" rx="18" fill="#F3EFE6" stroke="#E4DCCB" stroke-width="1.5"/>
+  <text class="fnd-h" x="88" y="762">🧰 底座 —— 把上面这些串在一起的东西</text>
+  <text class="fnd-t" x="88" y="798">Python 3.12 —— 写出整条流程的语言</text>
+  <text class="fnd-t" x="600" y="798">Git + GitHub —— 记住每一次修改</text>
+  <text class="fnd-t" x="1060" y="798">tqdm —— 装了，但进度条还没接上 🙈</text>
+
+  <text class="foot" x="60" y="866">⚠️ 诚实说明：这个 AI 目前只「上过 2 节课」（原计划 20 轮，实际只完成 2 轮），所以偶尔会漏掉进球 —— 这正是接下来要改进的第一件事。</text>
+</svg>
