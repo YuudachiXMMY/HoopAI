@@ -25,7 +25,22 @@ WORKDIR /app
 
 # Dependencies first, so a source edit does not re-resolve torch.
 COPY requirements.txt requirements-api.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-api.txt
+
+# -- CPU-only torch, installed BEFORE ultralytics -----------------------------
+# ultralytics depends on torch, and the default PyPI torch wheel for Linux
+# bundles the CUDA runtime: nvidia-cusparselt (221 MB), nccl (216 MB), nvshmem
+# (135 MB) and a dozen more. Measured during the first build of this file —
+# the image was heading past 6 GB of GPU libraries on a server that has no GPU
+# and never will. On a VPS shared with six other applications that is not a
+# slow build, it is a disk-space incident.
+#
+# Installing torch from PyTorch's CPU index first means the ultralytics install
+# below finds the requirement already satisfied and does not pull the CUDA
+# variant. Order matters: reverse these two and pip resolves the GPU wheel.
+RUN pip install --no-cache-dir \
+        --index-url https://download.pytorch.org/whl/cpu \
+        torch torchvision \
+    && pip install --no-cache-dir -r requirements.txt -r requirements-api.txt
 
 COPY backend/ ./backend/
 COPY ingest/ ./ingest/
