@@ -11,7 +11,12 @@ from pydantic import BaseModel, EmailStr, Field
 
 from backend import config
 from backend.database import connection
-from backend.security import create_token, hash_password, verify_password
+from backend.security import (
+    create_token,
+    hash_password,
+    verify_password,
+    waste_time_like_a_real_verify,
+)
 
 log = logging.getLogger("hoopai.auth")
 
@@ -95,6 +100,11 @@ def login(data: LoginRequest) -> TokenResponse:
         ).fetchone()
 
         if user is None:
+            # Spend a verification's worth of time anyway. The two branches
+            # return the same body and the same status; without this they are
+            # still told apart by how long they take, because argon2 is tens
+            # of milliseconds and a dictionary lookup is not.
+            waste_time_like_a_real_verify()
             outcome, retry_after = "unknown", 0
         elif (user["locked_until"] or 0) > now:
             outcome, retry_after = "locked", int(user["locked_until"] - now) + 1

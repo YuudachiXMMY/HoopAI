@@ -48,6 +48,43 @@ def test_wrong_password_and_unknown_account_are_indistinguishable(client):
     assert wrong.json() == unknown.json()
 
 
+def test_unknown_and_known_accounts_take_comparable_time(client):
+    """Identical error bodies are not enough if the clock gives it away.
+
+    argon2 is deliberately tens of milliseconds. Skipping it for an email that
+    is not in the table makes "no such account" measurably faster than "wrong
+    password", which rebuilds the enumeration oracle the shared message
+    removes. The fix is a dummy verify on the unknown branch.
+
+    The tolerance is loose on purpose — this is a shared CI machine, not a lab
+    bench. It is sized to catch the real regression (one branch skipping argon2
+    entirely, a several-fold difference) and not to be flaky about scheduler
+    noise. A tight threshold here would be turned off within a month.
+    """
+    import statistics
+    import time
+
+    client.post("/auth/signup", json={"email": "known@example.com", "password": "correct-horse"})
+
+    def timed(email: str) -> float:
+        samples = []
+        for _ in range(5):
+            start = time.perf_counter()
+            client.post("/auth/login", json={"email": email, "password": "wrong-password-here"})
+            samples.append(time.perf_counter() - start)
+        return statistics.median(samples)
+
+    known = timed("known@example.com")
+    unknown = timed("nobody@example.com")
+
+    ratio = max(known, unknown) / max(min(known, unknown), 1e-9)
+    assert ratio < 3.0, (
+        f"login timing distinguishes a known account ({known * 1000:.1f} ms) from an "
+        f"unknown one ({unknown * 1000:.1f} ms), ratio {ratio:.1f}x — the unknown branch "
+        "is probably skipping the password verification"
+    )
+
+
 def test_passwords_are_not_stored_as_unsalted_sha256(client):
     """The original stored `hashlib.sha256(password).hexdigest()`.
 

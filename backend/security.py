@@ -27,6 +27,29 @@ def hash_password(password: str) -> str:
     return _hasher.hash(password)
 
 
+# A real argon2 hash of a value nobody can supply, used to spend the same time
+# on a login for an account that does not exist as on one that does. Computed
+# once at import rather than per call so the cost lands at startup.
+#
+# WHY: argon2 is deliberately slow — tens of milliseconds. Returning 401
+# immediately for an unknown email and 401-after-a-hash for a known one makes
+# the two distinguishable by response time, which rebuilds the account
+# enumeration oracle that the identical error messages were there to remove.
+# Over a few samples that difference is trivially measurable across the
+# internet.
+_DUMMY_HASH = _hasher.hash("this value is never a password")
+
+
+def waste_time_like_a_real_verify() -> None:
+    """Spend one password-verification's worth of CPU and return nothing.
+
+    Called on the "no such account" branch of login. Not in a `try` that
+    swallows: if this ever raises, the hasher is broken and the login path
+    should fail loudly rather than silently losing the timing equalisation.
+    """
+    verify_password("this value is never a password ", _DUMMY_HASH)
+
+
 def verify_password(password: str, stored_hash: str) -> bool:
     """Check a password, returning False rather than raising on any mismatch.
 
