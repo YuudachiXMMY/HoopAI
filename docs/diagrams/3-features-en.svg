@@ -1,0 +1,134 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900">
+  <defs>
+    <style>
+      text { font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+      .mono { font-family: "SF Mono", Menlo, Consolas, monospace; }
+      .t-title { font-size: 44px; font-weight: 700; fill: #1F2430; }
+      .t-sub   { font-size: 19px; fill: #6B7280; }
+      .pill    { font-size: 19px; font-weight: 700; }
+      .count   { font-size: 15px; fill: #9CA3AF; }
+      .f-title { font-size: 17.5px; font-weight: 700; fill: #1F2430; }
+      .f-desc  { font-size: 14.5px; fill: #4B5563; }
+      .f-mod   { font-size: 12px; fill: #9CA3AF; }
+      .g-title { font-size: 16px; font-weight: 700; fill: #1F2430; }
+      .g-desc  { font-size: 13.5px; fill: #6B6250; }
+      .foot    { font-size: 16px; fill: #6B7280; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="#FFFDF8"/>
+
+  <text class="t-title" x="60" y="68">What can HoopAI do today — and what can’t it?</text>
+  <text class="t-sub" x="60" y="102">On the left: written and running today. On the right: still missing — building those is what comes next.</text>
+
+  <!-- ================= LEFT : DONE ================= -->
+  <rect x="60" y="140" width="900" height="690" rx="18" fill="#FFFFFF" stroke="#D9EAE0" stroke-width="1.5"/>
+  <rect x="84" y="160" width="208" height="40" rx="12" fill="#E7F6EE"/>
+  <text class="pill" x="102" y="187" fill="#157347">✅ Works today</text>
+  <text class="count" x="936" y="187" text-anchor="end">8 items</text>
+  <line x1="84" y1="216" x2="936" y2="216" stroke="#EEF3F0" stroke-width="1.5"/>
+
+  <!-- row 1 -->
+  <rect x="84" y="232" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="272" font-size="24">🖼</text>
+  <text class="f-title" x="142" y="272">Splits the video, keeps the time</text>
+  <text class="f-desc" x="104" y="302">Every photo knows which second it is,</text>
+  <text class="f-desc" x="104" y="324">so the cuts land in the right place.</text>
+  <text class="f-mod mono" x="104" y="348">ingest/frame_extractor.py</text>
+
+  <rect x="520" y="232" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="272" font-size="24">🏀</text>
+  <text class="f-title" x="578" y="272">Spots ball and hoop together</text>
+  <text class="f-desc" x="540" y="302">An AI we trained ourselves, taught to</text>
+  <text class="f-desc" x="540" y="324">find only these two things.</text>
+  <text class="f-mod mono" x="540" y="348">detect/basket_detector.py</text>
+
+  <!-- row 2 -->
+  <rect x="84" y="380" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="420" font-size="24">📐</text>
+  <text class="f-title" x="142" y="420">Not fussy about the angle</text>
+  <text class="f-desc" x="104" y="450">It judges from where the hoop actually</text>
+  <text class="f-desc" x="104" y="472">is, so you can move around and film.</text>
+  <text class="f-mod mono" x="104" y="496">detect/ + events/</text>
+
+  <rect x="520" y="380" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="420" font-size="24">⬇️</text>
+  <text class="f-title" x="578" y="420">Tells a make from a miss</text>
+  <text class="f-desc" x="540" y="450">The ball has to be falling, so one on its</text>
+  <text class="f-desc" x="540" y="472">way up or blocked does not count.</text>
+  <text class="f-mod mono" x="540" y="496">events/scoring_event.py</text>
+
+  <!-- row 3 -->
+  <rect x="84" y="528" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="568" font-size="24">⏱</text>
+  <text class="f-title" x="142" y="568">Never counts one basket twice</text>
+  <text class="f-desc" x="104" y="598">A 3-second cooldown, so one continuous</text>
+  <text class="f-desc" x="104" y="620">move is not counted several times.</text>
+  <text class="f-mod mono" x="104" y="644">events/scoring_event.py</text>
+
+  <rect x="520" y="528" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="568" font-size="24">✂️</text>
+  <text class="f-title" x="578" y="568">Cuts the highlights by itself</text>
+  <text class="f-desc" x="540" y="598">One clip per basket: 4 s before + 2 s after,</text>
+  <text class="f-desc" x="540" y="620">timestamp built into the filename.</text>
+  <text class="f-mod mono" x="540" y="644">clips/clip_exporter.py</text>
+
+  <!-- row 4 -->
+  <rect x="84" y="676" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="104" y="716" font-size="24">🛟</text>
+  <text class="f-title" x="142" y="716">One bad clip, rest still fine</text>
+  <text class="f-desc" x="104" y="746">Fails or hangs past 120 s and it is skipped,</text>
+  <text class="f-desc" x="104" y="768">then it tells you which ones were lost.</text>
+  <text class="f-mod mono" x="104" y="792">clips/clip_exporter.py</text>
+
+  <rect x="520" y="676" width="416" height="130" rx="12" fill="#FAFDFB" stroke="#E2EFE8" stroke-width="1.5"/>
+  <text x="540" y="716" font-size="24">🔐</text>
+  <text class="f-title" x="578" y="716">Can check the AI file is genuine</text>
+  <text class="f-desc" x="540" y="746">Give it a sha256 checksum and it refuses</text>
+  <text class="f-desc" x="540" y="768">to load anything that does not match.</text>
+  <text class="f-mod mono" x="540" y="792">detect/basket_detector.py</text>
+
+  <!-- ================= RIGHT : NOT YET ================= -->
+  <rect x="990" y="140" width="550" height="690" rx="18" fill="#FFFDF7" stroke="#F0DEBC" stroke-width="1.5"/>
+  <rect x="1014" y="160" width="248" height="40" rx="12" fill="#FDF4E3"/>
+  <text class="pill" x="1032" y="187" fill="#B4740A">🚧 Not yet / planned</text>
+  <text class="count" x="1516" y="187" text-anchor="end">7 items</text>
+  <line x1="1014" y1="216" x2="1516" y2="216" stroke="#F5EBD8" stroke-width="1.5"/>
+
+  <rect x="1014" y="232" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="264" font-size="19">🚫</text>
+  <text class="g-title" x="1062" y="264">No one-click button</text>
+  <text class="g-desc" x="1030" y="290">You wire the 5 steps together in a few lines of code</text>
+
+  <rect x="1014" y="316" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="348" font-size="19">🎓</text>
+  <text class="g-title" x="1062" y="348">The AI is still a beginner</text>
+  <text class="g-desc" x="1030" y="374">20 rounds of training planned, 2 done — it misses baskets</text>
+
+  <rect x="1014" y="400" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="432" font-size="19">🐢</text>
+  <text class="g-title" x="1062" y="432">On the slow side</text>
+  <text class="g-desc" x="1030" y="458">CPU only for now; a long video can take tens of minutes</text>
+
+  <rect x="1014" y="484" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="516" font-size="19">🧪</text>
+  <text class="g-title" x="1062" y="516">Not a single test</text>
+  <text class="g-desc" x="1030" y="542">No safety net when you change the scoring rule</text>
+
+  <rect x="1014" y="568" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="600" font-size="19">🙈</text>
+  <text class="g-title" x="1062" y="600">No progress bar</text>
+  <text class="g-desc" x="1030" y="626">You cannot tell how far along it is (tqdm installed, unused)</text>
+
+  <rect x="1014" y="652" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="684" font-size="19">🙋</text>
+  <text class="g-title" x="1062" y="684">Knows no players and no score</text>
+  <text class="g-desc" x="1030" y="710">No idea who shot it, and no teams are tracked</text>
+
+  <rect x="1014" y="736" width="502" height="72" rx="10" fill="#FFFFFF" stroke="#F5E3C3" stroke-width="1.5"/>
+  <text x="1030" y="768" font-size="19">⚙️</text>
+  <text class="g-title" x="1062" y="768">The tolerance is fixed</text>
+  <text class="g-desc" x="1030" y="794">The 1.4× is hard-coded; changing it means editing source</text>
+
+  <text class="foot" x="60" y="872">✅ = really in the code and runs today　|　🚧 = not there yet, it is what comes next　|　right now this is a box of building blocks, not a finished app.</text>
+</svg>
