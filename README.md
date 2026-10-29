@@ -152,8 +152,14 @@ Output filename format: `{video_name}_basket_{index:03d}_t{timestamp:.1f}s.mp4`
 
 | File | Contents |
 |------|----------|
+| [docs/STUDENT_GUIDE.md](docs/STUDENT_GUIDE.md) | **Start here if you just want to use HoopAI.** Accounts, uploading, getting clips back, and what the limits mean. Part 2 covers deploying, for maintainers with an SSH key. |
 | [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) | Development environment, code style, testing, PR checklist |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | Model training and retraining, troubleshooting, dataset configuration |
+
+The guide above is about the **hosted** instance at
+https://hoopai.ithacateens.com. The rest of this README is about running the
+pipeline on your own machine; the two are independent and you do not need the
+local setup to use the hosted one.
 
 ## Datasets
 
