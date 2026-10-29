@@ -110,3 +110,12 @@ data/**
 !.codex/prompts/
 !.codex/prompts/**
 .claude/worktrees/
+
+# ---- Backend runtime state ----
+# The API database was committed once (empty, but it is state, and in a
+# container it is state that an image rebuild silently resets). It now lives
+# on a mounted volume — see HOOPAI_DB_PATH.
+backend/hoopai.db
+backend/uploads/
+backend/highlights/
+highlights/

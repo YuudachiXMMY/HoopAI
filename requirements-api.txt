@@ -1,0 +1,19 @@
+# HoopAI API dependencies.
+#
+# Kept separate from requirements.txt (the CV pipeline) on purpose: the API
+# container installs both, but a student running only `hoopal.py` on a laptop
+# should not be made to install a web framework, and CI for the API should not
+# pull ultralytics' torch wheels to run a 2-second test suite.
+#
+# Pinned with lower bounds rather than exact versions to match the style of
+# requirements.txt. If this app acquires a release process, pin exactly.
+
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+# Multipart form parsing. FastAPI raises at import time without it, so the
+# original backend could not have accepted a single upload as shipped.
+python-multipart>=0.0.18
+# EmailStr; the original imported it from pydantic without this installed.
+pydantic[email]>=2.9.0
+PyJWT>=2.9.0
+argon2-cffi>=23.1.0
