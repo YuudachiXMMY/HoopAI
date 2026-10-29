@@ -36,7 +36,14 @@ def main():
     print(f"Sample:     every {args.sample} frame(s)\n")
 
     info = get_video_info(str(video_path))
-    print(f"Video info: {info['frame_count']} frames, {info['fps']:.1f} fps, {info['duration']:.1f}s\n")
+    # `duration_seconds`, not `duration`. get_video_info has never returned the
+    # latter, so this line raised KeyError on every single run — before any
+    # frame was read, which is why it was invisible: the crash happens in the
+    # banner, so there is no partial output to suggest the pipeline started.
+    print(
+        f"Video info: {info['frame_count']} frames, "
+        f"{info['fps']:.1f} fps, {info['duration_seconds']:.1f}s\n"
+    )
 
     detector = BasketDetector(model_path=args.model, confidence=args.confidence)
     event_detector = ScoringEventDetector()
