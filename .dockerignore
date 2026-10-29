@@ -1,0 +1,46 @@
+# Keep the build context small and secret-free.
+#
+# data/ is the big one: it holds 100+ MB of training images and zip archives
+# that the API has no use for. The model weights the pipeline DOES need are
+# mounted at /models at runtime, not copied in — see apps/hoopai/README.md in
+# the IthacaServer repo.
+
+.git
+.github
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Datasets, sample footage, model weights
+data/
+runs/
+*.pt
+*.pth
+*.onnx
+*.mp4
+*.mov
+*.zip
+
+# Local state that must never be baked into an image
+.env
+.env.*
+backend/hoopai.db
+backend/uploads/
+backend/highlights/
+highlights/
+
+# Docs and agent tooling
+docs/
+*.md
+.claude
+.codex
+.omx
+.codegraph
+.DS_Store
+tests/

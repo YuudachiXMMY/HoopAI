@@ -1,118 +1,290 @@
+"""Video upload, job status, and clip download.
+
+THE AUTHORISATION BUG THIS FILE WAS REWRITTEN TO FIX
+
+`get_results` used to open with:
+
+    get_user_from_token(authorization)
+
+— the return value discarded — and then look the job up by id alone. The call
+reads like an authorisation check and is not one: it proves the caller holds
+*a* valid token, never that the job belongs to them. Job ids are UUID4 and so
+not guessable, but "unguessable identifier" is a speed bump, not an access
+control: ids appear in URLs, in screenshots, in the shared-laptop browser
+history of a classroom. Any student with any account could read any other
+student's results by quoting one.
+
+Every handler below therefore takes `user_id` from `CurrentUser` and puts it in
+the WHERE clause. The pattern to preserve: the dependency returns an id and the
+query uses it. A handler that calls the dependency and ignores what it returns
+is the bug, re-introduced.
+"""
+
+from __future__ import annotations
+
+import logging
 import uuid
-import threading
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException, Header
+from typing import Annotated
+
 import jwt
-from backend.database import get_connection
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
+
+from backend import config, jobs
+from backend.database import connection
+from backend.security import decode_token
+
+log = logging.getLogger("hoopai.video")
 
 router = APIRouter()
 
-SECRET_KEY = "hoopai-secret-change-in-production"
-UPLOAD_DIR = Path(__file__).parent.parent / "uploads"
-HIGHLIGHTS_DIR = Path(__file__).parent.parent / "highlights"
+# Replaces `authorization: str = Header(...)` plus a manual
+# `.replace("Bearer ", "")`. That string replace was not anchored, so a token
+# containing the substring anywhere had it stripped out of the middle; the
+# scheme was never actually verified either.
+_bearer = HTTPBearer(auto_error=True)
 
 
-def get_user_from_token(authorization: str):
+def current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer)],
+) -> int:
     try:
-        token = authorization.replace("Bearer ", "")
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        return payload["user_id"]
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        return decode_token(credentials.credentials)
+    except (jwt.InvalidTokenError, ValueError, TypeError):
+        # ValueError/TypeError cover `int(payload["sub"])` inside decode_token.
+        # Not reachable today — only create_token mints a sub, and PyJWT >=2.10
+        # requires it to be a string — but a non-integer sub must be a 401, not
+        # a 500. An auth path should not contain a branch that fails in the
+        # shape of a server error.
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from None
 
 
-def run_pipeline(job_id: str, video_path: str, clips_dir: str):
-    import subprocess
-    import sys
+CurrentUser = Annotated[int, Depends(current_user)]
 
-    conn = get_connection()
-    conn.execute("UPDATE jobs SET status = 'processing' WHERE id = ?", (job_id,))
-    conn.commit()
-    conn.close()
 
+class UploadAccepted(BaseModel):
+    job_id: str
+    status: str
+
+
+class JobResult(BaseModel):
+    job_id: str
+    status: str
+    basket_count: int
+    clips: list[str]
+    error: str | None
+
+
+def _safe_suffix(filename: str | None) -> str:
+    """Return a vetted extension, or reject the upload.
+
+    The original built its path as `UPLOAD_DIR / f"{job_id}_{file.filename}"`
+    with the client-supplied name interpolated raw. `Path.__truediv__` does not
+    sanitise, and `..` segments resolve, so a filename of
+    `../../../../etc/cron.d/x` escaped the upload directory entirely — the
+    `{job_id}_` prefix only renames the first segment, it does not anchor the
+    rest. The stored name here is the job UUID plus an allow-listed extension;
+    nothing the client sent reaches the filesystem.
+    """
+    suffix = Path(filename or "").suffix.lower()
+    if suffix not in config.ALLOWED_VIDEO_EXTENSIONS:
+        allowed = ", ".join(sorted(config.ALLOWED_VIDEO_EXTENSIONS))
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Unsupported file type. Allowed extensions: {allowed}",
+        )
+    return suffix
+
+
+async def _store_upload(upload: UploadFile, destination: Path) -> None:
+    """Stream the body to disk, aborting past MAX_UPLOAD_BYTES.
+
+    The original was `content = await file.read()` — the entire upload into
+    memory before a single byte hit disk, with no ceiling. A phone video is
+    routinely over a gigabyte, and the container has a memory limit; the first
+    large upload was an OOM kill of the API for every user at once.
+
+    Content-Length is not consulted: it is client-supplied and a chunked
+    request need not send one. Counting what actually arrives is the only
+    figure that cannot be lied about.
+    """
+    written = 0
     try:
-        result = subprocess.run(
-            [sys.executable, "hoopal.py", "--input", video_path, "--output", clips_dir],
-            capture_output=True,
-            text=True,
-            cwd=Path(__file__).parent.parent.parent,
+        with destination.open("wb") as sink:
+            while chunk := await upload.read(1024 * 1024):
+                written += len(chunk)
+                if written > config.MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        # Literal 413 rather than a `status.` name: Starlette
+                        # renamed the constant (REQUEST_ENTITY_TOO_LARGE →
+                        # CONTENT_TOO_LARGE) and the requirements pin only a
+                        # lower bound, so either name is a version trap.
+                        status_code=413,
+                        detail=f"Video exceeds the {config.MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.",
+                    )
+                sink.write(chunk)
+        # An empty upload is not a video, and accepting it is free storage and
+        # a free jobs row for the sender. Checked after the stream rather than
+        # from Content-Length, which is client-supplied.
+        if written < config.MIN_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail="That file is empty or too small to be a video.",
+            )
+    except BaseException:
+        # Includes the 413 and the 400 above. Without this the rejected upload
+        # stays on disk, so "too large" becomes a way to fill the volume for
+        # free.
+        destination.unlink(missing_ok=True)
+        raise
+
+
+@router.post("/upload", response_model=UploadAccepted, status_code=status.HTTP_202_ACCEPTED)
+async def upload_video(user_id: CurrentUser, file: UploadFile = File(...)) -> UploadAccepted:
+    suffix = _safe_suffix(file.filename)
+
+    # Per-user ceiling on stored jobs, checked BEFORE a byte is written.
+    #
+    # Without it the cheap attack beats the expensive one: there is no minimum
+    # size, so a 0-byte .mp4 costs the attacker nothing, never fills the queue
+    # (it drains in milliseconds, so the 429 never fires), and still creates a
+    # jobs row plus a highlights/<uuid>/ directory every time. A loop of those
+    # is inode exhaustion on /var/lib/docker — the filesystem shared with the
+    # public site and six other applications — and signup is open to anyone.
+    with connection() as conn:
+        held = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE user_id = ?", (user_id,)
+        ).fetchone()["n"]
+    if held >= config.MAX_JOBS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"You already have {held} videos stored (limit {config.MAX_JOBS_PER_USER}). "
+                "Ask an instructor to clear some before uploading more."
+            ),
         )
-
-        # Count clips produced
-        clips = list(Path(clips_dir).glob("*.mp4"))
-        basket_count = len(clips)
-
-        conn = get_connection()
-        conn.execute(
-            "UPDATE jobs SET status = 'done', basket_count = ? WHERE id = ?",
-            (basket_count, job_id),
-        )
-        conn.commit()
-        conn.close()
-
-    except Exception as e:
-        conn = get_connection()
-        conn.execute(
-            "UPDATE jobs SET status = 'error', error = ? WHERE id = ?",
-            (str(e), job_id),
-        )
-        conn.commit()
-        conn.close()
-
-
-@router.post("/upload")
-async def upload_video(
-    file: UploadFile = File(...),
-    authorization: str = Header(...),
-):
-    user_id = get_user_from_token(authorization)
 
     job_id = str(uuid.uuid4())
-    video_path = UPLOAD_DIR / f"{job_id}_{file.filename}"
-    clips_dir = HIGHLIGHTS_DIR / job_id
+    video_path = config.UPLOAD_DIR / f"{job_id}{suffix}"
+    clips_dir = config.HIGHLIGHTS_DIR / job_id
 
-    UPLOAD_DIR.mkdir(exist_ok=True)
+    config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # The clips directory is created AFTER the upload succeeds. Creating it
+    # first meant every rejected upload — oversized, empty, wrong type — still
+    # left an empty directory behind, so the reject paths were themselves a way
+    # to consume inodes for free.
+    await _store_upload(file, video_path)
     clips_dir.mkdir(parents=True, exist_ok=True)
 
-    with open(video_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO jobs (id, user_id, status, video_path, clips_dir) VALUES (?, ?, 'pending', ?, ?)",
+            (job_id, user_id, str(video_path), str(clips_dir)),
+        )
 
-    conn = get_connection()
-    conn.execute(
-        "INSERT INTO jobs (id, user_id, status, video_path, clips_dir) VALUES (?, ?, 'pending', ?, ?)",
-        (job_id, user_id, str(video_path), str(clips_dir)),
+    try:
+        jobs.submit(job_id, str(video_path), str(clips_dir))
+    except jobs.QueueFull:
+        # Refuse loudly rather than queue without bound. See the header comment
+        # in jobs.py for why the bound exists at all.
+        with connection() as conn:
+            conn.execute(
+                "UPDATE jobs SET status = 'error', error = ? WHERE id = ?",
+                ("Server busy — not accepted.", job_id),
+            )
+        video_path.unlink(missing_ok=True)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many videos are being processed right now. Please try again in a few minutes.",
+            headers={"Retry-After": "120"},
+        ) from None
+
+    log.info("job %s queued by user %s", job_id, user_id)
+    return UploadAccepted(job_id=job_id, status="pending")
+
+
+def _load_owned_job(job_id: str, user_id: int):
+    """Fetch a job belonging to this user, or 404.
+
+    404 rather than 403 for a job owned by someone else: a 403 would confirm
+    the id exists, which is the enumeration oracle the ownership check is here
+    to remove.
+    """
+    with connection() as conn:
+        job = conn.execute(
+            "SELECT * FROM jobs WHERE id = ? AND user_id = ?",
+            (job_id, user_id),
+        ).fetchone()
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found.")
+    return job
+
+
+@router.get("/results/{job_id}", response_model=JobResult)
+def get_results(job_id: str, user_id: CurrentUser) -> JobResult:
+    job = _load_owned_job(job_id, user_id)
+
+    clips: list[str] = []
+    if job["status"] == "done" and job["clips_dir"]:
+        clips = sorted(path.name for path in Path(job["clips_dir"]).glob("*.mp4"))
+
+    return JobResult(
+        job_id=job_id,
+        status=job["status"],
+        basket_count=job["basket_count"],
+        clips=clips,
+        error=job["error"],
     )
-    conn.commit()
-    conn.close()
-
-    thread = threading.Thread(target=run_pipeline, args=(job_id, str(video_path), str(clips_dir)))
-    thread.daemon = True
-    thread.start()
-
-    return {"job_id": job_id, "status": "pending"}
 
 
-@router.get("/results/{job_id}")
-def get_results(job_id: str, authorization: str = Header(...)):
-    get_user_from_token(authorization)
+@router.get("/results/{job_id}/clips/{clip_name}")
+def download_clip(job_id: str, clip_name: str, user_id: CurrentUser) -> FileResponse:
+    """Serve one clip to the student who produced it.
 
-    conn = get_connection()
-    job = conn.execute("SELECT * FROM jobs WHERE id = ?", (job_id,)).fetchone()
-    conn.close()
+    The original listed clip names and provided no way to fetch them, so the
+    obvious next step would have been a static mount over the highlights
+    directory — which is every job's output, served to anyone, with no owner
+    check. Routing downloads through here keeps the ownership check on the path
+    that matters.
+    """
+    job = _load_owned_job(job_id, user_id)
 
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
+    # `clip_name` is a path segment from the URL and is treated as hostile:
+    # FastAPI does not decode `%2e%2e%2f` into a traversal for a non-path
+    # converter, but the resolve-and-compare below is what makes that a
+    # property of this handler rather than of the router's current behaviour.
+    clips_dir = Path(job["clips_dir"]).resolve()
+    target = (clips_dir / clip_name).resolve()
+    if not target.is_relative_to(clips_dir) or target.suffix.lower() != ".mp4" or not target.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clip not found.")
 
-    clips = []
-    if job["status"] == "done":
-        clips_path = Path(job["clips_dir"])
-        clips = [f.name for f in clips_path.glob("*.mp4")]
+    return FileResponse(target, media_type="video/mp4", filename=target.name)
 
-    return {
-        "job_id": job_id,
-        "status": job["status"],
-        "basket_count": job["basket_count"],
-        "clips": clips,
-        "error": job["error"],
-    }
+
+@router.get("/jobs", response_model=list[JobResult])
+def list_jobs(user_id: CurrentUser) -> list[JobResult]:
+    """This user's jobs, newest first."""
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50",
+            (user_id,),
+        ).fetchall()
+
+    return [
+        JobResult(
+            job_id=row["id"],
+            status=row["status"],
+            basket_count=row["basket_count"],
+            clips=[],
+            error=row["error"],
+        )
+        for row in rows
+    ]
