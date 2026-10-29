@@ -92,6 +92,18 @@ MODEL_PATH = Path(os.environ.get("HOOPAI_MODEL_PATH", PIPELINE_ROOT / "data/mode
 # handler now streams, and stops at this many bytes.
 MAX_UPLOAD_BYTES = _int("HOOPAI_MAX_UPLOAD_MB", 512) * 1024 * 1024
 
+# The other end of the range, and the one that was missing. With no floor, a
+# 0-byte .mp4 is a free jobs row and a free directory: it never fills the queue
+# (it drains instantly, so the 429 never fires) and it costs the sender
+# nothing. A loop of them is inode exhaustion on a filesystem shared with six
+# other applications. 1 KiB is below any real video and above any empty one.
+MIN_UPLOAD_BYTES = _int("HOOPAI_MIN_UPLOAD_BYTES", 1024)
+
+# Stored jobs per account. Signup is open, so "one student, one folder of
+# footage" has to be enforced rather than assumed. Generous enough for a term
+# of coursework; finite, which is the point.
+MAX_JOBS_PER_USER = _int("HOOPAI_MAX_JOBS_PER_USER", 50)
+
 # Extension allow-list. Deliberately not a MIME check on the client-supplied
 # Content-Type, which is attacker-controlled and means nothing. This is a cheap
 # first gate; ffmpeg/OpenCV failing to decode is the real one.

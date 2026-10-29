@@ -53,7 +53,12 @@ def current_user(
 ) -> int:
     try:
         return decode_token(credentials.credentials)
-    except jwt.InvalidTokenError:
+    except (jwt.InvalidTokenError, ValueError, TypeError):
+        # ValueError/TypeError cover `int(payload["sub"])` inside decode_token.
+        # Not reachable today — only create_token mints a sub, and PyJWT >=2.10
+        # requires it to be a string — but a non-integer sub must be a 401, not
+        # a 500. An auth path should not contain a branch that fails in the
+        # shape of a server error.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
@@ -125,9 +130,18 @@ async def _store_upload(upload: UploadFile, destination: Path) -> None:
                         detail=f"Video exceeds the {config.MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.",
                     )
                 sink.write(chunk)
+        # An empty upload is not a video, and accepting it is free storage and
+        # a free jobs row for the sender. Checked after the stream rather than
+        # from Content-Length, which is client-supplied.
+        if written < config.MIN_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=400,
+                detail="That file is empty or too small to be a video.",
+            )
     except BaseException:
-        # Includes the 413 above. Without this the rejected upload stays on
-        # disk, so "too large" becomes a way to fill the volume for free.
+        # Includes the 413 and the 400 above. Without this the rejected upload
+        # stays on disk, so "too large" becomes a way to fill the volume for
+        # free.
         destination.unlink(missing_ok=True)
         raise
 
@@ -136,14 +150,39 @@ async def _store_upload(upload: UploadFile, destination: Path) -> None:
 async def upload_video(user_id: CurrentUser, file: UploadFile = File(...)) -> UploadAccepted:
     suffix = _safe_suffix(file.filename)
 
+    # Per-user ceiling on stored jobs, checked BEFORE a byte is written.
+    #
+    # Without it the cheap attack beats the expensive one: there is no minimum
+    # size, so a 0-byte .mp4 costs the attacker nothing, never fills the queue
+    # (it drains in milliseconds, so the 429 never fires), and still creates a
+    # jobs row plus a highlights/<uuid>/ directory every time. A loop of those
+    # is inode exhaustion on /var/lib/docker — the filesystem shared with the
+    # public site and six other applications — and signup is open to anyone.
+    with connection() as conn:
+        held = conn.execute(
+            "SELECT COUNT(*) AS n FROM jobs WHERE user_id = ?", (user_id,)
+        ).fetchone()["n"]
+    if held >= config.MAX_JOBS_PER_USER:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"You already have {held} videos stored (limit {config.MAX_JOBS_PER_USER}). "
+                "Ask an instructor to clear some before uploading more."
+            ),
+        )
+
     job_id = str(uuid.uuid4())
     video_path = config.UPLOAD_DIR / f"{job_id}{suffix}"
     clips_dir = config.HIGHLIGHTS_DIR / job_id
 
     config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    clips_dir.mkdir(parents=True, exist_ok=True)
 
+    # The clips directory is created AFTER the upload succeeds. Creating it
+    # first meant every rejected upload — oversized, empty, wrong type — still
+    # left an empty directory behind, so the reject paths were themselves a way
+    # to consume inodes for free.
     await _store_upload(file, video_path)
+    clips_dir.mkdir(parents=True, exist_ok=True)
 
     with connection() as conn:
         conn.execute(

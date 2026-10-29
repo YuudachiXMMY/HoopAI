@@ -14,7 +14,9 @@ import pytest
 from tests.conftest import auth
 
 
-def _upload(client, token, name="game.mp4", body=b"not-really-a-video"):
+# Above config.MIN_UPLOAD_BYTES (1 KiB). The floor exists so a 0-byte file is
+# not a free jobs row; these tests are not about that, so they clear it.
+def _upload(client, token, name="game.mp4", body=b"\0" * 4096):
     return client.post(
         "/video/upload",
         headers=auth(token),

@@ -8,6 +8,7 @@ copy of SECRET_KEY, which is how they were able to drift apart silently.
 from __future__ import annotations
 
 import datetime as _dt
+import threading
 
 import jwt
 from argon2 import PasswordHasher
@@ -15,16 +16,43 @@ from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatc
 
 from backend import config
 
-# Argon2id at the library's defaults, which track the OWASP guidance. The
-# previous scheme was a bare `hashlib.sha256(password)`: unsalted, so identical
-# passwords produced identical rows, and fast, so a leaked table is a
-# wordlist lookup rather than an attack. There is no migration path for those
-# hashes and no need for one — the table is empty.
-_hasher = PasswordHasher()
+# Argon2id. The previous scheme was a bare `hashlib.sha256(password)`:
+# unsalted, so identical passwords produced identical rows, and fast, so a
+# leaked table is a wordlist lookup rather than an attack. There is no
+# migration path for those hashes and no need for one — the table is empty.
+#
+# THE PARAMETERS ARE NOT THE LIBRARY DEFAULTS, AND MUST NOT BE.
+#
+# argon2-cffi defaults to memory_cost=65536 KiB — 64 MiB of RAM per concurrent
+# hash — and parallelism=4. Both signup and login are sync `def`, so Starlette
+# runs them in the anyio threadpool, which has 40 slots. 40 × 64 MiB is 2.5 GiB
+# against a 2 GiB container limit whose budget torch has already mostly spent.
+# Signup needs no authentication and no invite, so ~30 concurrent POSTs is an
+# unauthenticated OOM kill of the API, repeatable for as long as the attacker
+# cares to, with `restart: unless-stopped` obligingly bringing it back.
+#
+# These are OWASP's second recommended Argon2id profile (19 MiB, t=2, p=1).
+# parallelism=1 is also the right call here specifically: the container has a
+# 1.5-CPU limit, so four lanes per hash contend rather than help.
+#
+# Changing these does not invalidate existing hashes — the parameters are
+# encoded in each stored string, so old hashes keep verifying under the
+# settings they were created with.
+_hasher = PasswordHasher(memory_cost=19456, time_cost=2, parallelism=1)
+
+# Second line of defence, and the one that holds if the parameters above are
+# ever raised again. Caps how many hashes can be in flight at once regardless
+# of how many threadpool slots Starlette is willing to hand out: peak memory
+# is bounded at _MAX_CONCURRENT_HASHES × memory_cost rather than at 40 ×
+# memory_cost. Requests past the cap wait rather than fail — a slow login is
+# a worse experience, an OOM kill is an outage for every app on the host.
+_MAX_CONCURRENT_HASHES = 4
+_hash_slots = threading.Semaphore(_MAX_CONCURRENT_HASHES)
 
 
 def hash_password(password: str) -> str:
-    return _hasher.hash(password)
+    with _hash_slots:
+        return _hasher.hash(password)
 
 
 # A real argon2 hash of a value nobody can supply, used to spend the same time
@@ -59,7 +87,8 @@ def verify_password(password: str, stored_hash: str) -> bool:
     runs.
     """
     try:
-        _hasher.verify(stored_hash, password)
+        with _hash_slots:
+            _hasher.verify(stored_hash, password)
         return True
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False

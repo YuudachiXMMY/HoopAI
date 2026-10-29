@@ -9,7 +9,7 @@ import pytest
 from tests.conftest import auth
 
 
-def _upload(client, token, name, body=b"x", content_type="video/mp4"):
+def _upload(client, token, name, body=b"\0" * 4096, content_type="video/mp4"):
     return client.post(
         "/video/upload",
         headers=auth(token),
@@ -96,6 +96,66 @@ def test_an_upload_at_the_limit_is_accepted(client, make_user, monkeypatch):
     _, token = make_user()
 
     assert _upload(client, token, "fits.mp4", body=b"a" * 1024).status_code == 202
+
+
+@pytest.mark.parametrize("body", [b"", b"tiny"])
+def test_an_empty_or_tiny_upload_is_refused(client, make_user, body):
+    """The cheap attack, which beats the expensive one.
+
+    With no floor, a 0-byte .mp4 costs the sender nothing, drains the queue in
+    milliseconds so the 429 never fires, and still creates a jobs row and a
+    highlights/<uuid>/ directory every time. A loop of those is inode
+    exhaustion on the filesystem shared with six other applications — and
+    signup is open, so it needs no insider.
+    """
+    from backend import config
+
+    _, token = make_user()
+    assert _upload(client, token, "empty.mp4", body=body).status_code == 400
+    assert list(config.UPLOAD_DIR.iterdir()) == []
+
+
+def test_a_rejected_upload_leaves_no_clips_directory_behind(client, make_user):
+    """The reject paths must not be an inode faucet either.
+
+    clips_dir.mkdir used to run before the file was stored, so every refusal
+    still left an empty directory.
+    """
+    from backend import config
+
+    _, token = make_user()
+    _upload(client, token, "empty.mp4", body=b"")
+    _upload(client, token, "payload.sh")
+
+    assert not config.HIGHLIGHTS_DIR.exists() or list(config.HIGHLIGHTS_DIR.iterdir()) == []
+
+
+def test_a_user_cannot_store_more_than_the_job_cap(client, make_user, monkeypatch):
+    from backend import config
+
+    monkeypatch.setattr(config, "MAX_JOBS_PER_USER", 3)
+    _, token = make_user()
+
+    for _ in range(3):
+        assert _upload(client, token, "game.mp4").status_code == 202
+
+    refused = _upload(client, token, "game.mp4")
+    assert refused.status_code == 409
+    assert "limit" in refused.json()["detail"]
+
+
+def test_the_job_cap_is_per_user_not_global(client, make_user, monkeypatch):
+    from backend import config
+
+    monkeypatch.setattr(config, "MAX_JOBS_PER_USER", 2)
+    _, alice = make_user()
+    _, bob = make_user()
+
+    for _ in range(2):
+        assert _upload(client, alice, "game.mp4").status_code == 202
+    assert _upload(client, alice, "game.mp4").status_code == 409
+    # Bob's quota is untouched by Alice exhausting hers.
+    assert _upload(client, bob, "game.mp4").status_code == 202
 
 
 # -- Backpressure --------------------------------------------------------------

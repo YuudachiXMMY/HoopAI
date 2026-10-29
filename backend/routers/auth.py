@@ -51,11 +51,16 @@ def _normalise(email: str) -> str:
 def signup(data: Credentials) -> TokenResponse:
     email = _normalise(data.email)
 
+    # Hashed BEFORE the connection is opened. argon2 takes tens of
+    # milliseconds and is serialised behind a semaphore, so doing it inside the
+    # block would hold an open SQLite connection for the whole wait.
+    password_hash = hash_password(data.password)
+
     with connection() as conn:
         try:
             cursor = conn.execute(
                 "INSERT INTO users (email, password_hash) VALUES (?, ?)",
-                (email, hash_password(data.password)),
+                (email, password_hash),
             )
         except sqlite3.IntegrityError:
             # Narrowed from `except Exception`. The original reported EVERY
@@ -80,8 +85,18 @@ def login(data: LoginRequest) -> TokenResponse:
 
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        # One message for "no such account" and for "wrong password". Two
-        # distinct messages would make this endpoint an account enumerator.
+        # One message for "no such account" and for "wrong password", and (see
+        # below) one response time for both.
+        #
+        # THIS DOES NOT MAKE ACCOUNT ENUMERATION IMPOSSIBLE, only harder here.
+        # `/auth/signup` still answers 409 for an address that already exists,
+        # which is a cleaner oracle than anything this endpoint leaks — POST a
+        # list of firstname.lastname@school.tld and read off the hits. Closing
+        # that needs an email-verification step, i.e. a feature rather than a
+        # patch; until then, assume an attacker can learn who has an account
+        # and note that the per-account lockout below is consequently a
+        # targeted denial-of-service primitive against any address they
+        # confirm.
         detail="Invalid email or password.",
     )
 
