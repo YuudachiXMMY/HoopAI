@@ -212,6 +212,52 @@ accident.
 
 ---
 
+## Building your own front-end
+
+You can point a web page you built — on Figma, on Vercel, on anything — at
+`https://hoopai.ithacateens.com` and call the same endpoints this guide uses.
+Two things to know first, because both look like "the server is down" when
+they aren't.
+
+**1. Your page's address has to be on the allow-list.** Browsers refuse to let
+a page on one site read a response from another unless the other site says, by
+name, that it's allowed. HoopAI keeps that list server-side, so **send whoever
+looks after the server your page's address and ask them to add it.** Until they
+do, every call fails before it leaves the browser and your code sees a network
+error rather than a status code. A typical front-end reports that as something
+like *"Could not reach the server — make sure it's running"*, which is
+misleading: the server is fine, your origin just isn't listed.
+
+How to tell this apart from a real outage — open the browser's developer tools,
+Network tab, and look for a failed request to `hoopai.ithacateens.com`. If
+there's an `OPTIONS` request sitting there with status **400**, that's this. You
+can confirm it from a terminal too:
+
+```bash
+curl -i -X OPTIONS https://hoopai.ithacateens.com/auth/login \
+  -H 'Origin: https://your-page-address.example' \
+  -H 'Access-Control-Request-Method: POST'
+```
+
+`400 Disallowed CORS origin` means not on the list. `200` with an
+`access-control-allow-origin` header back means you're good, and the problem is
+somewhere in your own code.
+
+Note that the address is just the scheme and host — `https://your-site.example`
+with **no trailing slash and no path**. That matters when you report it: an
+entry with a slash on the end is added and still doesn't work.
+
+**2. The API is on `https`, and so must your page be.** A page served over
+`http` cannot call an `https` API from most browsers, and vice versa. Both
+`hoopai.ithacateens.com` and anything published on Figma are already `https`,
+so this only bites when you're testing a local file.
+
+If you're developing locally against your own copy of the backend, the
+addresses `http://localhost:5173` and `http://localhost:3000` are allowed out
+of the box — see `.env.example` in the repository.
+
+---
+
 ## When something goes wrong
 
 | What you see | What it means | What to do |
@@ -229,6 +275,7 @@ accident.
 | `429 Too many failed attempts` | 10 wrong passwords | Wait 15 minutes |
 | `404 Job not found` | Wrong id, or it isn't yours | Check `/video/jobs` for your real ids |
 | `status: error` | Processing failed | Tell an instructor the `job_id` — the details are in the server log, not in your response |
+| A network error from your own web page, often worded *"could not reach the server"* | Your page's address isn't on the allow-list — the request never left the browser | See [Building your own front-end](#building-your-own-front-end); check `/health` in a browser tab first to rule out a real outage |
 
 That last row is deliberate: error messages shown to you are kept vague on
 purpose, because detailed ones leak information about the server. An instructor
