@@ -134,10 +134,16 @@ TOKEN_TTL_HOURS = _int("HOOPAI_TOKEN_TTL_HOURS", 12)
 CORS_ORIGINS = _list("HOOPAI_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
 
 # For origins that cannot be enumerated ahead of time. The front-end students
-# build is published on Figma's hosting, which assigns a random subdomain per
-# site and a NEW one when a site is republished — so an exact list alone means
-# an operator edits the server's .env every time someone clicks publish, and a
-# student whose login broke has no way to tell that from the API being down.
+# build is published on Figma's hosting, which assigns each published site its
+# own randomly generated subdomain. Two things follow, and together they are
+# why this is a pattern and not a longer list: a list needs one entry per
+# student, and a student can change their own subdomain from their file's
+# Settings — the old one stops working the moment they do, with nothing on
+# this side told about it. A student whose login broke that way has no way to
+# tell it from the API being down.
+#
+# (Republishing does NOT reassign it — Figma reuses the same domain, including
+# across an unpublish. An earlier version of this comment claimed otherwise.)
 #
 #   HOOPAI_CORS_ORIGIN_REGEX=^https://[a-z0-9-]+\.figma\.site$
 #
