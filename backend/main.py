@@ -32,19 +32,35 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="HoopAI API", lifespan=lifespan)
 
-# Was allow_origins=["*"] with allow_credentials=True — a combination browsers
-# reject outright, so the policy never worked and nobody noticed how open it
-# was meant to be. Credentials are off because this API authenticates with a
-# Bearer header, not a cookie, so no cross-origin credential is needed; with
-# them off, `*` would in fact be safe, but an explicit list costs nothing and
-# keeps an unexpected browser client from quietly becoming a supported one.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=config.CORS_ORIGINS,
-    allow_credentials=False,
-    allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Content-Type"],
-)
+
+def add_cors(target: FastAPI) -> None:
+    """Install the CORS policy, reading it from `config` at call time.
+
+    A function rather than a bare `add_middleware` call so the policy can be
+    exercised in a test without re-importing this module — the settings are
+    read once at import, so a test that monkeypatches them afterwards would be
+    asserting against middleware that was already built. Production and the
+    tests therefore go through this one definition and cannot drift apart.
+
+    Was allow_origins=["*"] with allow_credentials=True — a combination
+    browsers reject outright, so the policy never worked and nobody noticed how
+    open it was meant to be. Credentials stay off because this API
+    authenticates with a Bearer header, not a cookie: a browser will not attach
+    one cross-origin, so admitting an origin grants it calls that anything with
+    a network connection could already make, and not the ability to act as a
+    logged-in student. That is what makes `CORS_ORIGIN_REGEX` tolerable.
+    """
+    target.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.CORS_ORIGINS,
+        allow_origin_regex=config.CORS_ORIGIN_REGEX,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+
+
+add_cors(app)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(video.router, prefix="/video", tags=["video"])

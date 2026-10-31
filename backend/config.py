@@ -12,7 +12,10 @@ bug rather than a breach, and a student running the API on a laptop should not
 need a six-line .env to see it boot.
 """
 
+from __future__ import annotations
+
 import os
+import re
 from pathlib import Path
 
 # Smallest key we will accept. 32 bytes is the HMAC-SHA256 block-size-adjacent
@@ -52,6 +55,66 @@ def _list(name: str, default: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def _origin_regex(name: str) -> str | None:
+    """Read the optional CORS origin pattern and return it anchored.
+
+    `None` when unset, which is what disables regex matching entirely.
+
+    Two things happen here rather than being left to whoever writes the value,
+    because this pattern decides which websites a browser will let read our
+    replies:
+
+    1. **It must compile.** Otherwise the first browser request is a 500, long
+       after the deploy reported success.
+    2. **It is wrapped in `\\A(?:...)\\Z`**, so it can only ever match a whole
+       origin. Unwrapped, `https://[a-z0-9-]+\\.figma\\.site` would also admit
+       `https://x.figma.site.attacker.example` — a stranger's own domain
+       holding a valid `Access-Control-Allow-Origin`.
+
+       Starlette already prevents that by itself, and the wrap is belt and
+       braces rather than a fix for a live hole. Stated that way because it was
+       measured rather than assumed: `requirements-api.txt` gives
+       `fastapi>=0.115.0` with no upper bound, so the question is what the
+       whole range does, and `starlette/middleware/cors.py` matches with
+       `re.fullmatch` (which anchors implicitly) in 0.21.0, 0.26.1, 0.37.2,
+       0.38.6 and 1.10.0 — while `fastapi>=0.115.0` cannot resolve below
+       `starlette>=0.37.2` in any case. There is no reachable version that
+       anchors only one end.
+
+       It is kept anyway because it is one f-string, and it makes the anchoring
+       a local property of this file instead of an inherited habit of a
+       transitive dependency that nothing here would notice changing.
+
+    A consequence worth knowing when writing the value: it does not need to
+    carry its own `^`/`$`. Including them is harmless and reads more obviously.
+    """
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return None
+
+    anchored = rf"\A(?:{raw})\Z"
+    try:
+        re.compile(anchored)
+    except re.error as exc:
+        # A *global* inline flag is only legal at the very start of a pattern,
+        # so `(?i)https://...` compiles alone and then dies once wrapped. Say
+        # so, because re's own "global flags not at the start of the
+        # expression" reads like a bug in here rather than something to change
+        # in the environment.
+        if re.match(r"\(\?[aiLmsux]+\)", raw):
+            raise ConfigError(
+                f"{name} may not open with a global inline flag such as (?i): this value "
+                f"is wrapped to match a whole origin, which moves the flag off the front. "
+                f"Use a scoped group instead — (?i:...).\n"
+                f"    got: {raw}"
+            ) from exc
+        raise ConfigError(
+            f"{name} is not a valid regular expression: {exc}\n    got: {raw}"
+        ) from exc
+
+    return anchored
+
+
 # -- Signing key --------------------------------------------------------------
 SECRET_KEY = _require("HOOPAI_SECRET_KEY")
 if len(SECRET_KEY) < MIN_SECRET_LENGTH:
@@ -69,6 +132,28 @@ TOKEN_TTL_HOURS = _int("HOOPAI_TOKEN_TTL_HOURS", 12)
 # setting was not merely permissive, it did not work — which is why nobody
 # noticed it was permissive. An explicit list is both correct and narrow.
 CORS_ORIGINS = _list("HOOPAI_CORS_ORIGINS", "http://localhost:5173,http://localhost:3000")
+
+# For origins that cannot be enumerated ahead of time. The front-end students
+# build is published on Figma's hosting, which assigns a random subdomain per
+# site and a NEW one when a site is republished — so an exact list alone means
+# an operator edits the server's .env every time someone clicks publish, and a
+# student whose login broke has no way to tell that from the API being down.
+#
+#   HOOPAI_CORS_ORIGIN_REGEX=^https://[a-z0-9-]+\.figma\.site$
+#
+# Unset by default: nothing is admitted by pattern unless someone asks for it.
+# Prefer a specific character class over `.*` or `.+`, which also match `/`,
+# `@`, `#` and `?` — see the Starlette CORSMiddleware docs.
+#
+# Be clear-eyed about what that example value grants. `figma.site` is shared
+# hosting anyone can publish to, so the pattern admits a stranger's page as
+# readily as a student's — the same class of decision as allow-listing
+# `*.github.io`. What keeps it a small grant here is the line below it in
+# add_cors(): credentials are off and auth is a Bearer header, so an admitted
+# origin gets calls that any machine with a network connection could already
+# make, and not the ability to act as a logged-in student. Should this API ever
+# move to cookie auth, this setting has to be revisited first.
+CORS_ORIGIN_REGEX = _origin_regex("HOOPAI_CORS_ORIGIN_REGEX")
 
 # -- Storage ------------------------------------------------------------------
 # Defaults point inside the package for local use. In the container these are
