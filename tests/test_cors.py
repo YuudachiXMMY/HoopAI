@@ -1,10 +1,12 @@
 """The CORS policy is a security boundary, so it gets tests.
 
 The front-end students build is published on hosting nobody here controls:
-Figma assigns a random subdomain per site, and a *new* one when a site is
-republished. So an exact allow-list means an ops change every time someone
-clicks publish — which is how this arrived as a bug report, with a preflight
-answered `400 Disallowed CORS origin` and no `Access-Control-Allow-Origin`.
+Figma gives each published site its own randomly generated subdomain, and the
+person who owns the site can change it from their own Settings at any time,
+with nothing on this side told about it. So an exact allow-list needs one
+entry per student and goes stale silently — which is how this arrived as a bug
+report, with a preflight answered `400 Disallowed CORS origin` and no
+`Access-Control-Allow-Origin`.
 
 What is checked here is which origins the running middleware admits, for both
 the exact list and the pattern. The pattern's *anchoring* is not checked here
@@ -118,8 +120,12 @@ def test_the_pattern_admits_a_published_figma_site(cors_app):
         assert response.headers["access-control-allow-origin"] == PUBLISHED
 
 
-def test_the_pattern_admits_a_republished_site_under_a_new_subdomain(cors_app):
-    """The whole point: a new random subdomain needs no ops change."""
+def test_the_pattern_admits_a_subdomain_nobody_listed(cors_app):
+    """The whole point: a subdomain this server has never heard of still works.
+
+    Which is every student's site but the one in the allow-list, and any site
+    whose owner has since changed its address.
+    """
     with cors_app([OWN_DOMAIN], FIGMA_REGEX) as client:
         assert _allowed(_preflight(client, "https://some-other-name-99887766.figma.site"))
 
