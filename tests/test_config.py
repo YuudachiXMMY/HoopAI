@@ -206,7 +206,7 @@ def test_surrounding_whitespace_is_not_part_of_the_email_key():
         "changeme",
         # The case the prefix guard exists for: a value mangled on the way in,
         # so the `re_` is gone. Accepted silently, it fails only at send time.
-        "XqPKWMjPnotarealkey",
+        "AbCdEfGhNotARealKey",
     ],
 )
 def test_a_malformed_email_key_stops_the_process(supplied):
