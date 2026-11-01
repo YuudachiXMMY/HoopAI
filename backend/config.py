@@ -40,6 +40,40 @@ def _require(name: str) -> str:
     return value
 
 
+def _optional_secret(name: str, prefix: str) -> str | None:
+    """Read an optional API credential, returning None when it is not set.
+
+    Unset means "the feature needing it is switched off", never "fall back to a
+    default". There is no usable default for somebody else's API key, and
+    inventing one turns a missing setting into a 401 from a third party, which
+    is a much harder thing to read than a None.
+
+    The prefix check is here because the alternative failure is invisible: a
+    value truncated by a stray shell quote is accepted happily at this point
+    and only shows up later as mail that never arrives, with no error anywhere
+    on this side. Note that the value is deliberately left out of the message —
+    a ConfigError goes to stderr and into the container log.
+
+    Be clear about the cost of that choice: raising here means a typo in an
+    optional mail key stops the whole API, not just outbound mail. It is the
+    right trade anyway, because the failure lands on the operator running the
+    deploy — who is watching, and whose fix is one line of .env — rather than
+    on a student weeks later wondering why no mail arrived. Blank remains the
+    way to say "off"; this error only fires on a value that was meant to be a
+    key and is not one.
+    """
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return None
+    if not value.startswith(prefix):
+        raise ConfigError(
+            f"{name} does not begin with {prefix!r}, so it cannot be a usable key. "
+            f"Leave it unset to run without outbound email; a placeholder value here "
+            f"would look configured and fail only at send time."
+        )
+    return value
+
+
 def _int(name: str, default: int) -> int:
     raw = os.environ.get(name, "").strip()
     if not raw:
@@ -225,3 +259,30 @@ LOGIN_LOCKOUT_SECONDS = _int("HOOPAI_LOGIN_LOCKOUT_SECONDS", 900)
 # Minimum password length at signup. Low enough not to fight students over it,
 # high enough that the argon2 cost actually matters.
 MIN_PASSWORD_LENGTH = _int("HOOPAI_MIN_PASSWORD_LENGTH", 10)
+
+# -- Outbound email -----------------------------------------------------------
+# API key for Resend, read for the email-verification flow.
+#
+# NOTHING IN THIS REPOSITORY READS IT YET. There is no mail-sending code and no
+# verification state in backend/ — signup inserts a row and returns a token, and
+# `EmailStr` on the request model checks the shape of an address, not that it
+# exists. So setting this today only makes the value reachable as
+# `config.RESEND_API_KEY`; it exists ahead of the feature so that the deploy can
+# already be carrying the key when the feature lands.
+#
+# Optional, and None when unset: a student running the API on a laptop has to
+# boot without a mail provider. Whatever sends mail later therefore has to
+# handle None rather than assume a string, and decide explicitly what "no mail
+# provider" means. Let signup through unverified — refusing every signup
+# because a key is missing takes the whole class down for a configuration
+# detail.
+#
+# Never given a default and never committed. This is a bearer credential for an
+# account that can send mail AS our domain, so a literal in the source is a
+# published ability to send mail as us — the same mistake as the old hardcoded
+# SECRET_KEY, with phishing rather than forged sessions on the other end of it.
+# Local value goes in .env; on the server it goes in apps/hoopai/.env.extra.
+# Rotate it in the Resend dashboard the moment it is pasted into a chat, a
+# screen share, or a terminal recording: unlike SECRET_KEY, rotating costs
+# nothing here, because no stored state is keyed to it.
+RESEND_API_KEY = _optional_secret("HOOPAI_RESEND_API_KEY", "re_")
