@@ -164,3 +164,83 @@ def test_the_host_protecting_limits_are_finite(name):
     importlib.reload  # keep the import meaningful to linters
     value = getattr(config, name)
     assert isinstance(value, int) and value >= 0
+
+
+# -- Outbound email -----------------------------------------------------------
+# The key is optional, so what is worth asserting is the three ways it goes
+# wrong: absent (fine — the feature is simply off), malformed (stop, because
+# the alternative is mail that silently never sends), and committed (never).
+
+_EMAIL_KEY = "re_" + "x" * 20
+
+
+def test_no_email_key_is_not_an_error():
+    """A laptop with no mail provider still has to boot the API."""
+    result = _import_config_with(_KEY, "c.RESEND_API_KEY")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "None"
+
+
+def test_a_well_formed_email_key_is_read():
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_RESEND_API_KEY": _EMAIL_KEY}, "c.RESEND_API_KEY"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == _EMAIL_KEY
+
+
+def test_surrounding_whitespace_is_not_part_of_the_email_key():
+    """`.env` files and copy-paste both add trailing spaces; a key with one is
+    a 401 from Resend that looks nothing like a configuration problem."""
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_RESEND_API_KEY": f"  {_EMAIL_KEY}\t"}, "c.RESEND_API_KEY"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == _EMAIL_KEY
+
+
+@pytest.mark.parametrize(
+    "supplied",
+    [
+        # A placeholder copied out of .env.example and never filled in.
+        "changeme",
+        # The case the prefix guard exists for: a value mangled on the way in,
+        # so the `re_` is gone. Accepted silently, it fails only at send time.
+        "AbCdEfGhNotARealKey",
+    ],
+)
+def test_a_malformed_email_key_stops_the_process(supplied):
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_RESEND_API_KEY": supplied}, "c.RESEND_API_KEY"
+    )
+    assert result.returncode != 0
+    assert "HOOPAI_RESEND_API_KEY" in result.stderr
+    # The value must not be echoed back. A ConfigError goes to stderr and from
+    # there into the container log, which is a much more durable place than the
+    # shell the value was pasted into.
+    assert supplied not in result.stderr
+
+
+def test_no_resend_key_is_committed_anywhere_in_the_tree():
+    """Resend keys look like `re_<base62>` and are easy to paste into a file.
+
+    Same reasoning as the SECRET_KEY grep above, with a worse payload: this
+    repository is public, and a send-mail-as-our-domain credential in the
+    history is phishing capability that outlives any later deletion.
+    """
+    # The leading character class is load-bearing: a bare `re_[A-Za-z0-9]+`
+    # also matches the middle of an ordinary identifier, and this file is full
+    # of names like `..._are_indistinguishable`.
+    result = subprocess.run(
+        ["git", "grep", "-nIE", r"(^|[^A-Za-z0-9_])re_[A-Za-z0-9_]{12,}"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    # This file is excluded: the literals above are deliberately not keys.
+    offenders = [
+        line
+        for line in result.stdout.splitlines()
+        if not line.startswith("tests/test_config.py:")
+    ]
+    assert offenders == [], "possible Resend key committed:\n" + "\n".join(offenders)

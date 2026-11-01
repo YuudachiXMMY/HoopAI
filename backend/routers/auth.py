@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import secrets
 import sqlite3
 import time
 
+import httpx
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
@@ -43,8 +45,48 @@ class TokenResponse(BaseModel):
     email: str
 
 
+class VerifyResponse(BaseModel):
+    message: str
+
+
+_VERIFICATION_TTL_SECONDS = 24 * 3600  # tokens expire after 24 hours
+
+
 def _normalise(email: str) -> str:
     return email.strip().lower()
+
+
+def _send_verification_email(to_email: str, token: str) -> None:
+    """Send a verification email via Resend. No-op if RESEND_API_KEY is unset."""
+    api_key = config.RESEND_API_KEY
+    if not api_key:
+        log.warning("RESEND_API_KEY not set — skipping verification email for %s", to_email)
+        return
+
+    verify_url = f"https://hoopai.ithacateens.com/auth/verify/{token}"
+    try:
+        resp = httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "from": "HoopAI <noreply@hoopai.ithacateens.com>",
+                "to": [to_email],
+                "subject": "Verify your HoopAI account",
+                "html": (
+                    f"<p>Welcome to HoopAI!</p>"
+                    f"<p>Click the link below to verify your email address. "
+                    f"The link expires in 24 hours.</p>"
+                    f"<p><a href='{verify_url}'>{verify_url}</a></p>"
+                ),
+            },
+            timeout=10.0,
+        )
+        if resp.status_code >= 400:
+            log.error("Resend API error %s: %s", resp.status_code, resp.text)
+        else:
+            log.info("verification email sent to %s", to_email)
+    except Exception:
+        log.exception("failed to send verification email to %s", to_email)
 
 
 @router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -59,23 +101,48 @@ def signup(data: Credentials) -> TokenResponse:
     with connection() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (email, password_hash) VALUES (?, ?)",
+                "INSERT INTO users (email, password_hash, verified) VALUES (?, ?, 0)",
                 (email, password_hash),
             )
         except sqlite3.IntegrityError:
-            # Narrowed from `except Exception`. The original reported EVERY
-            # failure — a disk error, a schema mismatch, a bug in the hasher —
-            # as "Email already registered", so the one error message a student
-            # ever saw was frequently a lie and the real fault was invisible.
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="That email is already registered.",
             ) from None
 
         user_id = cursor.lastrowid
+        token = secrets.token_urlsafe(32)
+        expires_at = time.time() + _VERIFICATION_TTL_SECONDS
+        conn.execute(
+            "INSERT INTO verification_tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
+            (token, user_id, expires_at),
+        )
 
     log.info("signup: user %s", user_id)
+    _send_verification_email(email, token)
     return TokenResponse(token=create_token(user_id, email), email=email)
+
+
+@router.get("/verify/{token}", response_model=VerifyResponse)
+def verify_email(token: str) -> VerifyResponse:
+    now = time.time()
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT user_id, expires_at FROM verification_tokens WHERE token = ?",
+            (token,),
+        ).fetchone()
+
+        if row is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid or already-used verification link.")
+        if row["expires_at"] < now:
+            conn.execute("DELETE FROM verification_tokens WHERE token = ?", (token,))
+            raise HTTPException(status_code=status.HTTP_410_GONE, detail="This verification link has expired. Please sign up again.")
+
+        conn.execute("UPDATE users SET verified = 1 WHERE id = ?", (row["user_id"],))
+        conn.execute("DELETE FROM verification_tokens WHERE token = ?", (token,))
+        log.info("email verified: user %s", row["user_id"])
+
+    return VerifyResponse(message="Email verified. You can now log in.")
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -110,17 +177,15 @@ def login(data: LoginRequest) -> TokenResponse:
     # did not. Hence: decide inside the block, raise after it has committed.
     with connection() as conn:
         user = conn.execute(
-            "SELECT id, email, password_hash, failed_logins, locked_until FROM users WHERE email = ?",
+            "SELECT id, email, password_hash, failed_logins, locked_until, verified FROM users WHERE email = ?",
             (email,),
         ).fetchone()
 
         if user is None:
-            # Spend a verification's worth of time anyway. The two branches
-            # return the same body and the same status; without this they are
-            # still told apart by how long they take, because argon2 is tens
-            # of milliseconds and a dictionary lookup is not.
             waste_time_like_a_real_verify()
             outcome, retry_after = "unknown", 0
+        elif not user["verified"]:
+            outcome, retry_after = "unverified", 0
         elif (user["locked_until"] or 0) > now:
             outcome, retry_after = "locked", int(user["locked_until"] - now) + 1
         elif not verify_password(data.password, user["password_hash"]):
@@ -149,6 +214,11 @@ def login(data: LoginRequest) -> TokenResponse:
             )
             outcome, retry_after = "ok", 0
 
+    if outcome == "unverified":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before logging in. Check your inbox for the verification link.",
+        )
     if outcome == "locked":
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

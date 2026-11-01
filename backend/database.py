@@ -84,8 +84,21 @@ def init_db() -> None:
         # A database created before the lockout columns existed still has to
         # work. Doing it here keeps init_db the single schema entry point
         # rather than introducing a migration tool for two columns.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS verification_tokens (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                expires_at REAL NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+            """
+        )
+
         existing = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
         if "failed_logins" not in existing:
             conn.execute("ALTER TABLE users ADD COLUMN failed_logins INTEGER NOT NULL DEFAULT 0")
         if "locked_until" not in existing:
             conn.execute("ALTER TABLE users ADD COLUMN locked_until REAL")
+        if "verified" not in existing:
+            conn.execute("ALTER TABLE users ADD COLUMN verified INTEGER NOT NULL DEFAULT 0")
