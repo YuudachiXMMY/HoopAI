@@ -53,6 +53,14 @@ def _optional_secret(name: str, prefix: str) -> str | None:
     and only shows up later as mail that never arrives, with no error anywhere
     on this side. Note that the value is deliberately left out of the message —
     a ConfigError goes to stderr and into the container log.
+
+    Be clear about the cost of that choice: raising here means a typo in an
+    optional mail key stops the whole API, not just outbound mail. It is the
+    right trade anyway, because the failure lands on the operator running the
+    deploy — who is watching, and whose fix is one line of .env — rather than
+    on a student weeks later wondering why no mail arrived. Blank remains the
+    way to say "off"; this error only fires on a value that was meant to be a
+    key and is not one.
     """
     value = os.environ.get(name, "").strip()
     if not value:
