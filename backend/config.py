@@ -234,6 +234,17 @@ MAX_JOBS_PER_USER = _int("HOOPAI_MAX_JOBS_PER_USER", 50)
 # first gate; ffmpeg/OpenCV failing to decode is the real one.
 ALLOWED_VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"})
 
+# -- Pipeline tuning ----------------------------------------------------------
+# On a CPU-only host, running YOLO on every frame of a 90-minute game pins a
+# core for a very long time. Sampling every Nth frame trades a small chance of
+# missing a very short basket event for a proportional reduction in runtime.
+# A basket takes ~2–4 seconds; at 30 fps that is 60–120 frames. Sampling every
+# 3rd frame still checks 20–40 frames per basket — more than enough to catch it.
+# Set to 1 to disable sampling (every frame). On a GPU host, 1 is fine; on the
+# shared VPS, 3 is a reasonable default that keeps single-job time under 10 min
+# for a typical varsity game.
+FRAME_SAMPLE = _int("HOOPAI_FRAME_SAMPLE", 3)
+
 # -- Job queue ----------------------------------------------------------------
 # This is the setting that protects the host rather than the app. The pipeline
 # is YOLO inference over every frame of a video; on the shared VPS this is
