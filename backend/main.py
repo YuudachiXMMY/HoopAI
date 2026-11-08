@@ -19,10 +19,35 @@ logging.basicConfig(
 log = logging.getLogger("hoopai")
 
 
+def log_email_mode() -> None:
+    """State on every boot whether outbound mail is on, and who it sends as.
+
+    Here and not in config.py because of an import-order detail that would make
+    the line vanish: `from backend import config` above runs before the
+    `basicConfig` call below it, so a log record emitted while config is being
+    imported goes to logging's handler of last resort, which drops anything
+    below WARNING. The ENABLED line would therefore be silently missing in the
+    exact case it is meant to confirm.
+
+    Why it exists at all: mail was off in production for three real signups and
+    the only trace was one WARNING per signup, buried among healthcheck lines
+    and only findable by someone who already suspected it. A line at startup is
+    greppable at a known place, once per restart, without that suspicion.
+    """
+    if config.EMAIL_ENABLED:
+        log.info("outbound email: ENABLED (resend, from=%s)", config.EMAIL_FROM)
+    else:
+        log.warning(
+            "outbound email: DISABLED (HOOPAI_RESEND_API_KEY unset) — signups are "
+            "let through unverified. Set HOOPAI_REQUIRE_EMAIL=1 to make this fatal."
+        )
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     # `@app.on_event("startup")` is deprecated and, more to the point, had no
     # shutdown counterpart — the worker threads below need one.
+    log_email_mode()
     init_db()
     jobs.fail_orphaned_jobs()
     jobs.start_workers()
@@ -79,5 +104,18 @@ def health() -> dict[str, object]:
     backpressure design working, and a healthcheck that failed on it would
     have Docker restart the container precisely when it is busiest — killing
     the job that is mid-flight.
+
+    `email` is reported for the same reason and with the same status: it is
+    information, and "disabled" is still `"status": "ok"` because an API with
+    no mail provider is a working API. It is here so that "is verification
+    mail actually on in production?" is one unauthenticated request rather
+    than an ssh session and a log grep — which is what it took last time, by
+    which point three signups had already been missed. Never the key itself,
+    only whether there is one.
     """
-    return {"status": "ok", "queue_depth": jobs.depth(), "queue_size": config.JOB_QUEUE_SIZE}
+    return {
+        "status": "ok",
+        "queue_depth": jobs.depth(),
+        "queue_size": config.JOB_QUEUE_SIZE,
+        "email": "configured" if config.EMAIL_ENABLED else "disabled",
+    }

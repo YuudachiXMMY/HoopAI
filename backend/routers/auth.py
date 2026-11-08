@@ -69,7 +69,7 @@ def _send_verification_email(to_email: str, token: str) -> None:
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "from": "HoopAI <noreply@hoopai.ithacateens.com>",
+                "from": config.EMAIL_FROM,
                 "to": [to_email],
                 "subject": "Verify your HoopAI account",
                 "html": (
