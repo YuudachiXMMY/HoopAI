@@ -4,9 +4,14 @@ Basketball scoring detection and highlight-clip pipeline. Pure Python, offline b
 
 ## The single most important thing
 
-**There is no entry script.** The repository contains only four library modules — no `main.py`, no CLI,
-no `if __name__ == "__main__"`. Do not look for one and do not assume it exists. Running the pipeline
-requires hand-written wiring code — a usable snippet is in [README · Usage](README.md#usage).
+**The pipeline has no entry script.** `ingest/`, `detect/`, `events/` and `clips/` are libraries — no
+CLI and no `if __name__ == "__main__"` between them. Do not look for one. Running the pipeline requires
+hand-written wiring code; a usable snippet is in [README · Usage](README.md#usage).
+
+Two things in the tree are not part of that and do run directly: `backend/` is a FastAPI service
+(`uvicorn backend.main:app`, deployed — see [STUDENT_GUIDE · Part 2](docs/STUDENT_GUIDE.md)), and
+`scripts/smoke_email.py` is a post-deploy check. **Most of the rest of this file describes the pipeline
+only and predates `backend/`; treat its claims as unverified for anything under `backend/`.**
 
 ## Code search
 
@@ -116,10 +121,18 @@ No linter / formatter / pre-commit hook. The existing conventions:
 
 ## Testing
 
-**There are no tests at all**, and `pytest` is not in `requirements.txt` either. There is no regression
-protection when changing the scoring logic — adding tests before touching `events/scoring_event.py` is
-recommended; it is pure standard library and can be driven directly with handcrafted dicts, making it
-the easiest thing to test.
+`tests/` covers `backend/` — run it with `python -m pytest` from the repo root. `pytest` is not in
+either requirements file, so install it separately.
+
+**The suite is currently red: 6 failures in `tests/test_auth_flow.py`.** They are not flaky and not
+yours. Commit `e3399c7` made `/auth/login` return 403 for an unverified account (`backend/routers/auth.py:187`)
+without updating the tests, which still assume signup is immediately followed by a successful login.
+Check against this baseline before assuming a change broke something.
+
+**The pipeline itself has no tests** — nothing covers `ingest/`, `detect/`, `events/` or `clips/`, so
+there is no regression protection when changing the scoring logic. Adding tests before touching
+`events/scoring_event.py` is recommended; it is pure standard library and can be driven directly with
+handcrafted dicts, making it the easiest thing to test.
 
 ## Documentation sync
 
