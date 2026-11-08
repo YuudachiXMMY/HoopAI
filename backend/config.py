@@ -84,6 +84,27 @@ def _int(name: str, default: int) -> int:
         raise ConfigError(f"{name} must be an integer, got {raw!r}") from exc
 
 
+def _bool(name: str, default: bool) -> bool:
+    """Read a flag, refusing anything that is not plainly true or false.
+
+    No silent coercion. The obvious `bool(os.environ.get(name))` makes the
+    string "false" mean true, and a flag that reads its own value backwards is
+    worse than having no flag at all. An unrecognised value therefore stops the
+    process rather than picking a side, because the two readings of a typo here
+    differ by whether the API boots.
+    """
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise ConfigError(
+        f"{name} must be one of 1/0, true/false, yes/no, on/off (got {raw!r})."
+    )
+
+
 def _list(name: str, default: str) -> list[str]:
     raw = os.environ.get(name, "").strip() or default
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -272,21 +293,21 @@ LOGIN_LOCKOUT_SECONDS = _int("HOOPAI_LOGIN_LOCKOUT_SECONDS", 900)
 MIN_PASSWORD_LENGTH = _int("HOOPAI_MIN_PASSWORD_LENGTH", 10)
 
 # -- Outbound email -----------------------------------------------------------
-# API key for Resend, read for the email-verification flow.
-#
-# NOTHING IN THIS REPOSITORY READS IT YET. There is no mail-sending code and no
-# verification state in backend/ — signup inserts a row and returns a token, and
-# `EmailStr` on the request model checks the shape of an address, not that it
-# exists. So setting this today only makes the value reachable as
-# `config.RESEND_API_KEY`; it exists ahead of the feature so that the deploy can
-# already be carrying the key when the feature lands.
+# API key for Resend, read by `_send_verification_email` in routers/auth.py.
 #
 # Optional, and None when unset: a student running the API on a laptop has to
-# boot without a mail provider. Whatever sends mail later therefore has to
-# handle None rather than assume a string, and decide explicitly what "no mail
-# provider" means. Let signup through unverified — refusing every signup
-# because a key is missing takes the whole class down for a configuration
-# detail.
+# boot without a mail provider, so a missing key leaves signup working and lets
+# the account through unverified. Refusing every signup over a configuration
+# detail would take the whole class down.
+#
+# That tolerance is also how this went wrong once already, so it is worth
+# stating what it costs. The key was absent in production across three real
+# signups. `_send_verification_email` did exactly what it is written to do —
+# logged a warning and returned — signup still answered 201, and nothing else
+# in the system knew that no verification mail had ever been sent. Hence the
+# two additions below: production opts out of the tolerance (REQUIRE_EMAIL),
+# and the mode is no longer something you have to go looking for (main.py logs
+# it at startup and reports it on /health).
 #
 # Never given a default and never committed. This is a bearer credential for an
 # account that can send mail AS our domain, so a literal in the source is a
@@ -297,3 +318,39 @@ MIN_PASSWORD_LENGTH = _int("HOOPAI_MIN_PASSWORD_LENGTH", 10)
 # screen share, or a terminal recording: unlike SECRET_KEY, rotating costs
 # nothing here, because no stored state is keyed to it.
 RESEND_API_KEY = _optional_secret("HOOPAI_RESEND_API_KEY", "re_")
+
+# Whether outbound mail is available at all. Everything that only needs to know
+# "is mail on" reads this instead of the key, so that answering the question on
+# /health or in a log line never involves handling the credential.
+EMAIL_ENABLED = RESEND_API_KEY is not None
+
+# The envelope sender. Here rather than inline in auth.py so that the
+# post-deploy check (scripts/smoke_email.py) probes the same address production
+# sends from. A check written against its own copy of this string would pass
+# happily while the real sending domain was unverified, which is the single
+# thing that check exists to catch.
+#
+# The domain must be a verified sender in the Resend dashboard. It is not
+# verified by anything on this side: Resend answers an unverified domain with a
+# 403 at send time, which auth.py logs and swallows.
+EMAIL_FROM = (
+    os.environ.get("HOOPAI_EMAIL_FROM", "").strip() or "HoopAI <noreply@hoopai.ithacateens.com>"
+)
+
+# Turn the missing-key tolerance off. Set this in the production environment and
+# nowhere else: with it on, a deploy that forgets the key fails during import —
+# loudly, in front of the operator who is watching the deploy and whose fix is
+# one line of .env — instead of starting an API that passes its healthcheck and
+# sends nothing.
+#
+# Deliberately checked at import rather than at the first send. A check at send
+# time happens on a code path no deploy exercises, after a real user is already
+# waiting for mail that is not coming.
+REQUIRE_EMAIL = _bool("HOOPAI_REQUIRE_EMAIL", False)
+if REQUIRE_EMAIL and not EMAIL_ENABLED:
+    raise ConfigError(
+        "HOOPAI_REQUIRE_EMAIL is set, so outbound email is mandatory here, but "
+        "HOOPAI_RESEND_API_KEY is unset or empty. Put the key in the environment "
+        "(on the server: apps/hoopai/.env.extra), or unset HOOPAI_REQUIRE_EMAIL "
+        "to run without mail — signups are then let through unverified."
+    )

@@ -221,6 +221,85 @@ def test_a_malformed_email_key_stops_the_process(supplied):
     assert supplied not in result.stderr
 
 
+# -- Making the key mandatory -------------------------------------------------
+# HOOPAI_REQUIRE_EMAIL exists because "optional" was read by a deploy as
+# "omittable", and the resulting API passed every check it had while sending
+# nothing. The assertions here are the two halves of that trade: production
+# cannot boot without a key, and a laptop still can.
+
+
+def test_requiring_email_without_a_key_stops_the_process():
+    """The whole point. A deploy that forgets the key must not come up."""
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_REQUIRE_EMAIL": "1"}, "c.RESEND_API_KEY"
+    )
+    assert result.returncode != 0
+    assert "HOOPAI_RESEND_API_KEY" in result.stderr
+    # The error has to name the way out, or the next operator under deploy
+    # pressure reaches for deleting the check.
+    assert "HOOPAI_REQUIRE_EMAIL" in result.stderr
+
+
+def test_requiring_email_with_a_key_imports():
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_REQUIRE_EMAIL": "1", "HOOPAI_RESEND_API_KEY": _EMAIL_KEY},
+        "c.EMAIL_ENABLED",
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "True"
+
+
+def test_not_requiring_email_still_boots_without_a_key():
+    """The laptop case, stated as a test so that tightening production cannot
+    quietly take it away."""
+    result = _import_config_with(_KEY, "c.EMAIL_ENABLED")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
+
+
+@pytest.mark.parametrize("supplied", ["0", "false", "no", "off", "FALSE", "Off"])
+def test_the_requirement_can_be_switched_off_by_value(supplied):
+    """`HOOPAI_REQUIRE_EMAIL=false` must mean false.
+
+    The naive `bool(os.environ.get(...))` reading makes every one of these
+    true, which would flip the flag's meaning for anyone who writes it out
+    rather than deleting the line.
+    """
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_REQUIRE_EMAIL": supplied}, "c.REQUIRE_EMAIL"
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "False"
+
+
+def test_an_unrecognised_flag_value_stops_the_process():
+    """Neither reading of a typo is safe to assume: guessing true takes down a
+    laptop that has no key, guessing false reinstates the silent failure."""
+    result = _import_config_with(
+        {**_KEY, "HOOPAI_REQUIRE_EMAIL": "maybe"}, "c.REQUIRE_EMAIL"
+    )
+    assert result.returncode != 0
+    assert "HOOPAI_REQUIRE_EMAIL" in result.stderr
+
+
+def test_the_example_env_does_not_claim_the_key_is_unread():
+    """The outage was caused by a comment, not by code.
+
+    `.env.example` told the operator "Nothing reads it yet: there is no
+    mail-sending code in backend/" for as long as that was true, and kept
+    telling them after auth.py started reading it — so the deploy that landed
+    the feature left the key out on the file's own advice. This asserts the
+    sentence is gone; the general rule it stands for is that a new required
+    setting and its .env.example entry land in the same commit.
+    """
+    text = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+    assert "Nothing reads it yet" not in text
+    # And the variable is present as a live, empty assignment rather than a
+    # commented-out suggestion, so that filling it in is an edit and not an
+    # act of noticing.
+    assert re.search(r"^HOOPAI_RESEND_API_KEY=$", text, re.MULTILINE)
+
+
 def test_no_resend_key_is_committed_anywhere_in_the_tree():
     """Resend keys look like `re_<base62>` and are easy to paste into a file.
 
