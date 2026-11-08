@@ -80,6 +80,7 @@ class JobResult(BaseModel):
     basket_count: int
     clips: list[str]
     error: str | None
+    queue_position: int | None = None  # only set when status is 'pending'
 
 
 def _safe_suffix(filename: str | None) -> str:
@@ -228,6 +229,21 @@ def _load_owned_job(job_id: str, user_id: int):
     return job
 
 
+def _queue_position(job_id: str) -> int | None:
+    """Return how many pending jobs are ahead of this one, or None if not pending."""
+    with connection() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM jobs
+            WHERE status = 'pending'
+              AND created_at <= (SELECT created_at FROM jobs WHERE id = ?)
+              AND id != ?
+            """,
+            (job_id, job_id),
+        ).fetchone()
+    return row["n"] + 1 if row else None
+
+
 @router.get("/results/{job_id}", response_model=JobResult)
 def get_results(job_id: str, user_id: CurrentUser) -> JobResult:
     job = _load_owned_job(job_id, user_id)
@@ -236,12 +252,15 @@ def get_results(job_id: str, user_id: CurrentUser) -> JobResult:
     if job["status"] == "done" and job["clips_dir"]:
         clips = sorted(path.name for path in Path(job["clips_dir"]).glob("*.mp4"))
 
+    queue_position = _queue_position(job_id) if job["status"] == "pending" else None
+
     return JobResult(
         job_id=job_id,
         status=job["status"],
         basket_count=job["basket_count"],
         clips=clips,
         error=job["error"],
+        queue_position=queue_position,
     )
 
 

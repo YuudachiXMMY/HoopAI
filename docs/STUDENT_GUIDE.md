@@ -422,9 +422,49 @@ instructor before relying on it if that ever changes.
 curl https://hoopai.ithacateens.com/health
 ```
 
-Expect `{"status":"ok","queue_depth":0,"queue_size":8}`. A healthy container is
-not the same thing as a working application; this endpoint is the cheapest way
-to tell the difference.
+Expect `{"status":"ok","queue_depth":0,"queue_size":8,"email":"configured"}`. A
+healthy container is not the same thing as a working application; this endpoint
+is the cheapest way to tell the difference.
+
+**`"email":"disabled"` in production is a bug**, even though `"status"` is still
+`"ok"`. It means `HOOPAI_RESEND_API_KEY` is not reaching the application, so
+nobody who signs up receives a verification mail and therefore nobody can log
+in — while every request returns a success code. This has happened: the key was
+missing for three real signups and nothing surfaced it. The startup log says the
+same thing in one line, which is worth a look after a deploy that changed any
+configuration:
+
+```bash
+ssh hoopai 'ops logs -n 200 api' | grep 'outbound email'
+```
+
+Expect `outbound email: ENABLED (resend, from=HoopAI <noreply@...>)`.
+
+### After a deploy that touched auth or email
+
+`/health` reports whether a key is *present*, which is not the same as the key
+working — it can be the wrong key, or the sending domain can have lost its DNS
+verification. Checking that properly means sending a message, so there is a
+script for it. It needs `ops shell`, so ask the server operator to run:
+
+```bash
+ssh hoopai 'ops shell api'      # then, at the container prompt:
+python scripts/smoke_email.py
+```
+
+It prints a line per stage and exits non-zero on the first failure:
+
+```
+  From   : HoopAI <noreply@hoopai.ithacateens.com>
+  Key    : ok
+  Domain : hoopai.ithacateens.com verified
+  Send   : accepted, id=01a1bbaf-...
+  Status : delivered
+```
+
+The message goes to `delivered@resend.dev`, Resend's own sink address — it
+travels the real send path but reaches no person, so this is safe to run as
+often as you like and does not create a test account in the live database.
 
 ## Looking after the key
 

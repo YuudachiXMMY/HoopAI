@@ -67,6 +67,7 @@ def _run_pipeline(job_id: str, video_path: str, clips_dir: str) -> None:
                 "--input", video_path,
                 "--output", clips_dir,
                 "--model", str(config.MODEL_PATH),
+                "--sample", str(config.FRAME_SAMPLE),
             ],
             capture_output=True,
             text=True,
